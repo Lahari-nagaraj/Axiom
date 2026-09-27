@@ -36,7 +36,7 @@ function esc(s=''){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt
 function addMessage(role, html, meta=''){
   const el=document.createElement('div'); el.className=`message ${role}`;
   const avatar=role==='assistant'?'<div class="avatar">S</div>':'';
-  const label=role==='assistant'?'CLOUDOPS SENTINEL':'ON-CALL ENGINEER';
+  const label=role==='assistant'?'AXIOM':'ON-CALL ENGINEER';
   el.innerHTML=`${avatar}<div class="message-body"><div class="message-label">${label}</div><div class="bubble">${html}</div>${meta}</div>`;
   messages.appendChild(el); messages.scrollTop=messages.scrollHeight; return el;
 }
@@ -90,7 +90,7 @@ newSessionBtn?.addEventListener('click',()=>{
   threadId = newThreadId();
   localStorage.setItem(THREAD_KEY, threadId);
   renderSession();
-  messages.innerHTML = `<div class="message assistant"><div class="avatar">S</div><div class="message-body"><div class="message-label">CLOUDOPS SENTINEL</div><div class="bubble intro">New incident memory session started. Describe the production issue and I’ll build context across your follow-up questions.</div></div></div>`;
+  messages.innerHTML = `<div class="message assistant"><div class="avatar">S</div><div class="message-body"><div class="message-label">AXIOM</div><div class="bubble intro">New incident memory session started. Describe the production issue and I’ll build context across your follow-up questions.</div></div></div>`;
   starters.style.display='flex';
   q.value=''; q.focus();
 });

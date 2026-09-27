@@ -23,7 +23,7 @@ def main():
         )
 
     print("=" * 68)
-    print("CloudOps Sentinel - Pinecone Knowledge Base Ingestion")
+    print("Axiom - Pinecone Knowledge Base Ingestion")
     print("=" * 68)
     print(f"Embedding model        : {s.embedding_model}")
     print(f"Embedding dimension    : 384")

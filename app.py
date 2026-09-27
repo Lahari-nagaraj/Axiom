@@ -19,7 +19,7 @@ UPLOADS.mkdir(exist_ok=True)
 
 
 app = FastAPI(
-    title="CloudOps Sentinel — Enterprise Incident Response Self-RAG Copilot",
+    title="Axiom — Enterprise Incident Response Self-RAG Copilot",
     version="2.0.0",
     description="Self-RAG copilot for cloud operations, production troubleshooting, and incident-response runbooks.",
 )
