@@ -1,21 +1,26 @@
 from functools import lru_cache
 
 from pinecone import Pinecone, ServerlessSpec
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_pinecone import PineconeVectorStore
+from langchain_pinecone import PineconeVectorStore, PineconeEmbeddings
 
 from src.config import get_settings
+
+
+EMBEDDING_DIMENSION = 1024
+EMBEDDING_MODEL = "llama-text-embed-v2"
 
 
 @lru_cache
 def get_embeddings():
     s = get_settings()
 
-    if not s.embedding_model:
-        raise RuntimeError("EMBEDDING_MODEL is not configured")
+    if not s.pinecone_api_key:
+        raise RuntimeError("PINECONE_API_KEY is not configured")
 
-    return HuggingFaceEmbeddings(
-        model_name=s.embedding_model
+    return PineconeEmbeddings(
+        model=EMBEDDING_MODEL,
+        dimension=EMBEDDING_DIMENSION,
+        pinecone_api_key=s.pinecone_api_key,
     )
 
 
@@ -29,7 +34,8 @@ def get_pinecone_client():
 
 
 def ensure_index():
-    """Create the Pinecone index if needed and verify embedding dimension compatibility."""
+    """Create the Pinecone index if needed and verify embedding dimension."""
+
     s = get_settings()
     pc = get_pinecone_client()
 
@@ -38,7 +44,7 @@ def ensure_index():
     if s.pinecone_index_name not in existing:
         pc.create_index(
             name=s.pinecone_index_name,
-            dimension=384,
+            dimension=EMBEDDING_DIMENSION,
             metric="cosine",
             spec=ServerlessSpec(
                 cloud=s.pinecone_cloud,
@@ -54,12 +60,15 @@ def ensure_index():
         if existing_dimension is None and isinstance(desc, dict):
             existing_dimension = desc.get("dimension")
 
-        if existing_dimension and int(existing_dimension) != 384:
+        if (
+            existing_dimension
+            and int(existing_dimension) != EMBEDDING_DIMENSION
+        ):
             raise RuntimeError(
                 f"Pinecone index '{s.pinecone_index_name}' has "
                 f"dimension {existing_dimension}, but "
-                f"{s.embedding_model} produces 384-dimensional embeddings. "
-                "Use a new index name or recreate the index with dimension 384."
+                f"{EMBEDDING_MODEL} is configured for "
+                f"{EMBEDDING_DIMENSION}-dimensional embeddings."
             )
 
     return pc.Index(s.pinecone_index_name)
