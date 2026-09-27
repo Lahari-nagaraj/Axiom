@@ -1,6 +1,6 @@
-# Axiom — Enterprise Response Self-RAG Copilot
+# Axiom - Self-RAG Copilot
 
-A production-style **Self-RAG** demo for cloud operations and incident response. It searches private operational knowledge in Pinecone first, self-grades the retrieved evidence, corrects weak retrieval/generation, and uses **internet search only when the private knowledge base is insufficient**.
+A production-style **Self-RAG** for operations and incident response. It searches private operational knowledge in Pinecone first, self-grades the retrieved evidence, corrects weak retrieval/generation, and uses **internet search only when the private knowledge base is insufficient**.
 
 The project also demonstrates **LangGraph SQLite persistence memory** so follow-up questions can reuse the same incident context through a stable `thread_id`.
 
@@ -51,7 +51,7 @@ SQLite Checkpoint / Memory
 ```text
 CloudOps-Sentinel-Enterprise-Incident-Response-Self-RAG-Copilot/
 ├── app.py
-├── data_ingestion.py          # ONE file to build the Pinecone KB
+├── data_ingestion.py          
 ├── src/
 │   ├── config.py
 │   ├── db.py
@@ -59,15 +59,15 @@ CloudOps-Sentinel-Enterprise-Incident-Response-Self-RAG-Copilot/
 │   ├── models.py
 │   ├── self_rag.py
 │   └── vectorstore.py
-├── documents/                 # initial private knowledge documents
+├── documents/                
 │   ├── checkout-api-runbook.md
 │   ├── payments-high-cpu-runbook.md
 │   └── deployment-rollback-sop.md
 ├── templates/index.html
 ├── static/styles.css
 ├── static/app.js
-├── uploads/                   # documents uploaded through the UI
-├── data/                      # SQLite persistence files
+├── uploads/                  
+├── data/                      
 ├── requirements.txt
 ├── Dockerfile
 ├── docker-compose.yml
