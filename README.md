@@ -77,15 +77,25 @@ CloudOps-Sentinel-Enterprise-Incident-Response-Self-RAG-Copilot/
 # Key Features
 
 Self-RAG workflow with retrieval and generation verification
+
 Private-first retrieval using Pinecone
+
 Evidence grading before generating answers
+
 IsSUP — verifies whether the answer is supported by evidence
+
 IsUSE — evaluates answer usefulness
+
 Query rewriting and retrieval retry for weak results
+
 Tavily web fallback when private knowledge is insufficient
+
 LangGraph SQLite memory for contextual follow-up questions
+
 Document upload for adding new knowledge to the system
+
 FastAPI backend with a simple web interface
+
 LangSmith tracing for workflow observability
 
 Activate venv ->  .\.venv\Scripts\Activate.ps1
