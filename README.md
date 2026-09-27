@@ -37,8 +37,8 @@ SQLite Checkpoint / Memory
 ## Tech stack
 
 - **LangGraph** — Self-RAG workflow, conditional routing, persistent thread state
-- **OpenAI `gpt-5-mini`** — routing, query rewriting, generation, relevance grading, IsSUP and IsUSE
-- **OpenAI `text-embedding-3-large`** — embeddings for private operational documents
+- **Groq `openai/gpt-oss-120b`** — routing, query rewriting, generation, relevance grading, IsSUP and IsUSE
+- **Hugging Face `BAAI/bge-small-en-v1.5`** — embeddings for private operational documents
 - **Pinecone** — private runbooks/SOPs/postmortems knowledge base
 - **Tavily** — controlled internet-search fallback
 - **SQLite** — LangGraph persistence memory + simple audit database for the demo
@@ -101,7 +101,7 @@ pip install -r requirements.txt
 Copy `.env.example` to `.env` and configure:
 
 ```env
-OPENAI_API_KEY=...
+GROQ_API_KEY=...
 PINECONE_API_KEY=...
 TAVILY_API_KEY=...
 ```
@@ -109,10 +109,10 @@ TAVILY_API_KEY=...
 The defaults are:
 
 ```env
-OPENAI_MODEL=gpt-5-mini
-EMBEDDING_MODEL=text-embedding-3-large
-EMBEDDING_DIMENSION=3072
-PINECONE_INDEX_NAME=cloudops-sentinel-openai-self-rag
+GROQ_MODEL=openai/gpt-oss-120b
+EMBEDDING_MODEL=BAAI/bge-small-en-v1.5
+EMBEDDING_DIMENSION=384
+PINECONE_INDEX_NAME=cloudops-sentinel-bge-small-self-rag
 PINECONE_NAMESPACE=incident-runbooks
 ```
 
@@ -137,7 +137,7 @@ Load ./documents
   ↓
 Split documents into chunks
   ↓
-OpenAI text-embedding-3-large
+Hugging Face BAAI/bge-small-en-v1.5 embeddings (384 dimensions)
   ↓
 Upsert to Pinecone
   ↓
@@ -175,7 +175,7 @@ The left-side **Runbook Vault** accepts:
 - Markdown
 - DOCX
 
-When you click **Add to knowledge base**, the backend uses the exact same ingestion layer and OpenAI embedding model as `data_ingestion.py`.
+When you click **Add to knowledge base**, the backend uses the exact same ingestion layer and Hugging Face embedding model as `data_ingestion.py`.
 
 ```text
 New UI Document
@@ -184,7 +184,7 @@ FastAPI /api/upload
       ↓
 Document Loader + Chunking
       ↓
-OpenAI Embeddings
+Hugging Face BAAI/bge-small-en-v1.5 Embeddings
       ↓
 EXISTING Pinecone Index
       ↓
@@ -245,7 +245,7 @@ Ask about a technical issue that is not covered by any private runbook. Self-RAG
 
 The application and ingestion script both import `src/vectorstore.py`. That means they always use the same:
 
-- OpenAI embedding model
+- Hugging Face embedding model
 - embedding dimension
 - Pinecone index
 - Pinecone namespace
