@@ -1,0 +1,508 @@
+run_id,system_version,question_id,category,question,answer,retrieved_sources,retrieved_source_count,ground_truth_sources,expected_answer_points,latency_seconds,retries,route,support_status,usefulness,used_web_search,request_failed,error,prompt_tokens,completion_tokens,total_tokens,token_usage_available,answer_correctness_manual,faithfulness_manual,manual_notes
+20261016T122620Z,baseline_rag,Q01,direct,What is the first thing to compare when 502 errors start on the checkout API immediately after a release?,The first thing to compare is **the incident start time with the timestamp of the most recent deployment**【Doc 2】. This lets you determine whether the 502 errors are temporally correlated with the new release.,checkout-api-runbook.md;checkout-api-runbook.md;checkout-api-runbook.md;payments-high-cpu-runbook.md;payments-high-cpu-runbook.md,5,checkout-api-runbook.md,Compare the incident start time with the latest deployment timestamp. | The 502-after-deployment check order starts with deployment correlation.,11.771,0,internal_retrieval,,,,False,,666,117,783,True,,,
+20261016T122620Z,axiom_self_rag,Q01,direct,What is the first thing to compare when 502 errors start on the checkout API immediately after a release?,"**First step:** Compare the incident start time with the timestamp of the most recent deployment. (See the Checkout API Production Runbook, “502 errors after a deployment” – step 1.)",checkout-api-runbook.md;payments-high-cpu-runbook.md,2,checkout-api-runbook.md,Compare the incident start time with the latest deployment timestamp. | The 502-after-deployment check order starts with deployment correlation.,20.628,0,Private Runbooks,fully_supported,useful,False,False,,,,,False,,,
+20261016T122620Z,baseline_rag,Q02,direct,In what order should an on-call engineer work through the checks for checkout-api 502 errors that begin after a deployment?,"**Order of checks for 502 errors that appear right after a checkout‑api deployment**
+
+1. **Compare the incident start time with the latest deployment timestamp.**  
+2. **Check the Kubernetes deployment and pod status for `checkout‑api`.**  
+3. **Inspect readiness‑probe failures before restarting pods** – a pod that fails readiness must not receive production traffic.  
+4. **Review the latest checkout‑api application logs** for startup, dependency, or configuration errors.  
+5. **Verify that required environment variables and secrets** are present in the new deployment.  
+6. **Check connectivity from checkout‑api to the Payment Gateway and Orders database.**  
+7. **If the new release is strongly correlated with the incident and the error rate stays above 5 % for five minutes, roll back** to the last known healthy image using the approved deployment‑rollback procedure.  
+
+*Source: “checkout‑api‑runbook.md” – the numbered list of checks (Doc 2).*",checkout-api-runbook.md;checkout-api-runbook.md;checkout-api-runbook.md;deployment-rollback-sop.md;payments-high-cpu-runbook.md,5,checkout-api-runbook.md,Compare incident start time with latest deployment timestamp. | Check Kubernetes deployment and pod status for checkout-api. | Inspect readiness-probe failures before restarting pods. | Review recent checkout-api logs for startup/dependency/configuration errors. | Verify required environment variables and secrets are present. | Check connectivity to the Payment Gateway and Orders database. | Roll back to the last known healthy image if the error rate stays above 5% for five minutes.,2.533,0,internal_retrieval,,,,False,,749,308,1057,True,,,
+20261016T122620Z,axiom_self_rag,Q02,direct,In what order should an on-call engineer work through the checks for checkout-api 502 errors that begin after a deployment?,"**Order of checks for 502 errors on checkout‑api that appear right after a deployment**  
+*(taken from the Checkout API Production Runbook – “502 errors after a deployment”)*  
+
+1. **Correlate timing** – Compare the incident start time with the timestamp of the most recent deployment.  
+2. **Kubernetes health** – Verify the deployment and pod status for `checkout‑api` (e.g., `kubectl get deployment/pods`).  
+3. **Readiness‑probe results** – Look for readiness‑probe failures. If a pod is failing readiness it should not be receiving traffic; do **not** restart pods before confirming the probe state.  
+4. **Application logs** – Review the newest checkout‑api logs for startup errors, missing dependencies, or configuration problems.  
+5. **Env vars & secrets** – Confirm that all required environment variables and secrets are present and correctly injected in the new pods.  
+6. **External connectivity** – Test connectivity from checkout‑api to the Payment Gateway and to the Orders PostgreSQL database.  
+7. **Rollback decision** – If the new release is strongly correlated with the incident and the 502 error rate stays > 5 % for ≥ 5 minutes, initiate a rollback to the last known healthy image using the approved **Production Deployment Rollback SOP**.  
+
+**Caution:** Do **not** delete or repeatedly recreate pods as a first step; preserve logs and events for diagnosis (Runbook note).  
+
+If after these steps the load balancer still cannot reach healthy pods despite passing readiness checks, or database connection‑pool errors persist post‑rollback, follow the escalation guidance in the runbook.",checkout-api-runbook.md;deployment-rollback-sop.md;payments-high-cpu-runbook.md,3,checkout-api-runbook.md,Compare incident start time with latest deployment timestamp. | Check Kubernetes deployment and pod status for checkout-api. | Inspect readiness-probe failures before restarting pods. | Review recent checkout-api logs for startup/dependency/configuration errors. | Verify required environment variables and secrets are present. | Check connectivity to the Payment Gateway and Orders database. | Roll back to the last known healthy image if the error rate stays above 5% for five minutes.,28.806,0,Private Runbooks,fully_supported,useful,False,False,,,,,False,,,
+20261016T122620Z,baseline_rag,Q03,direct,Should the on-call engineer delete checkout-api pods repeatedly as the first response to 502 errors?,"No. The runbook explicitly advises **not** to delete checkout‑api pods repeatedly as a first‑response action. Instead, the engineer should preserve the pods’ logs and events for diagnosis. (See Doc 1: “Do not delete pods repeatedly as a first response. Preserve logs and events needed for diagnosis.”)",checkout-api-runbook.md;checkout-api-runbook.md;checkout-api-runbook.md;payments-high-cpu-runbook.md;payments-high-cpu-runbook.md,5,checkout-api-runbook.md,No. Do not delete pods repeatedly as a first response. | Preserve logs and events needed for diagnosis.,6.641,0,internal_retrieval,,,,False,,646,151,797,True,,,
+20261016T122620Z,axiom_self_rag,Q03,direct,Should the on-call engineer delete checkout-api pods repeatedly as the first response to 502 errors?,"**No.** The checkout‑api runbooks state that deleting the pods repeatedly is **not** the first‑line response to a 502 error.
+
+* The runbook explicitly says: “Do not delete pods repeatedly as a first response. Preserve logs and events needed for diagnosis.”【INTERNAL 1】.  
+
+* The runbook also lists the initial investigation steps that should be performed before any pod recreation:
+
+  1. Compare the incident start time with the latest deployment timestamp【INTERNAL 3】.  
+  2. Check the Kubernetes deployment and pod status for `checkout‑api`【INTERNAL 3】.  
+  3. Inspect readiness‑probe failures; a pod that fails readiness never receives traffic【INTERNAL 3】.  
+  4. Review the most recent application logs for startup, dependency, or configuration errors【INTERNAL 3】.  
+  5. Verify that required environment variables and secrets are present in the new deployment【INTERNAL 3】.  
+  6. Test connectivity from `checkout‑api` to downstream services such as the Payment Gateway and Orders database【INTERNAL 3】.  
+  7. If the new release is clearly correlated with the incident and the error rate stays above 5 % for five minutes, perform a **rollback** rather than deleting pods【INTERNAL 3】.
+
+**What to do instead**
+
+1. **Do not delete pods as the first step.** Keep them running so that logs and events remain available for analysis【INTERNAL 1】.  
+2. Follow the ordered checklist above to diagnose the cause of the 502 responses.  
+3. If the investigation points to a faulty release, execute the approved rollback procedure (step 7)【INTERNAL 3】.  
+4. Only consider a rolling restart or pod recreation after you have gathered the necessary logs and confirmed that the issue is not due to the current pod state.
+
+Following these steps preserves diagnostic information and addresses the underlying problem, as required by the checkout‑api runbooks.",checkout-api-runbook.md;payments-high-cpu-runbook.md,2,checkout-api-runbook.md,No. Do not delete pods repeatedly as a first response. | Preserve logs and events needed for diagnosis.,102.42,2,Private Runbooks,fully_supported,useful,False,False,,,,,False,,,
+20261016T122620Z,baseline_rag,Q04,paraphrased,Our checkout-api just returned a wave of 502s right after we shipped a new image. Walk me through how we diagnose whether the deployment caused it.,"**How to tell if the new checkout‑api image caused the 502 surge**
+
+1. **Time correlation** – First, compare the moment the 502s started with the timestamp of the most recent checkout‑api deployment. If the incident began *immediately* after the release, that is a strong initial clue.【Doc 2】
+
+2. **Deployment & pod health** – Inspect the Kubernetes deployment for checkout‑api:
+   * Verify the deployment object shows the new replica set is active.  
+   * Check the status of the pods (Ready = 1/1, no CrashLoopBackOff, etc.).【Doc 2】
+
+3. **Readiness‑probe results** – Look at the readiness‑probe metrics for the new pods.  
+   * Any failures mean the pod should not have been receiving traffic, but if they are occurring it could explain the 502s. Do **not** delete the pods yet; keep their logs and events for later analysis.【Doc 2】【Doc 3】
+
+4. **Application logs** – Pull the latest checkout‑api logs (startup, init, and request handling) and search for:
+   * Errors loading configuration or environment variables.  
+   * Failures connecting to the Payment Gateway, Inventory Service, Redis, or PostgreSQL.  
+   * Any stack traces that indicate a regression introduced by the new image.【Doc 2】
+
+5. **Environment variables & secrets** – Confirm that all required env‑vars and secrets are present and correctly injected in the new deployment. Missing or malformed values often cause the service to reject traffic, resulting in 502s.【Doc 2】
+
+6. **Dependency connectivity** – From a healthy pod (or using a temporary exec session), test connectivity to:
+   * The Payment Gateway endpoint.  
+   * The Orders PostgreSQL database.  
+   * Redis session cache.  
+   If any of these checks fail, the checkout‑api may be returning 502s because it cannot reach a downstream service.【Doc 2】
+
+7. **Error‑rate threshold** – Measure the 502 error rate. If it stays above **5 % for at least five minutes** and the above checks point to the new release, the deployment is likely the cause.【Doc 2】
+
+8. **Decision point – rollback** – When the new release is strongly correlated with the incident and the error rate threshold is met, initiate the approved rollback to the last known healthy image (following the rollback SOP).【Doc 2】【Doc 5】
+
+9. **What NOT to do initially** – Do not repeatedly delete or recreate pods; this can destroy the logs and events you need for diagnosis. Preserve them for post‑mortem.【Doc 3】
+
+10. **Escalation (if needed)** – If the load balancer reports it cannot reach any healthy checkout‑api pods *even though* readiness checks are passing, hand the case to the platform team. If you see persistent connection‑pool errors after a rollback, involve the database team.【Doc 3】
+
+Following these steps in order will let you determine whether the just‑shipped image is responsible for the 502 wave and, if so, give you a clear path to roll back safely.",checkout-api-runbook.md;checkout-api-runbook.md;checkout-api-runbook.md;payments-high-cpu-runbook.md;deployment-rollback-sop.md,5,checkout-api-runbook.md,"Correlate the incident start with the deployment timestamp. | Check Kubernetes deployment/pod status. | Inspect readiness-probe failures before restarting pods. | Review application logs for startup, dependency, or configuration errors. | Verify environment variables and secrets in the new deployment.",7.858,0,internal_retrieval,,,,False,,756,851,1607,True,,,
+20261016T122620Z,axiom_self_rag,Q04,paraphrased,Our checkout-api just returned a wave of 502s right after we shipped a new image. Walk me through how we diagnose whether the deployment caused it.,"**Diagnosing a 502 surge after a new checkout‑api image**
+
+Follow the checklist in the *Checkout API Production Runbook* (see [INTERNAL 1‑3]).  Work through the items in order; stop as soon as you have a clear answer.
+
+| Step | What to do | Why it matters | What to look for |
+|------|------------|----------------|------------------|
+| **1. Correlate timing** | Compare the incident start time with the timestamp of the most recent deployment. | If the 502s began *immediately* after the release, the deployment is a strong candidate. | Use your CI/CD dashboard or `kubectl rollout history deployment/checkout-api` to get the deployment time. |
+| **2. Check deployment & pod health** | Run `kubectl get deployment checkout-api -n <prod‑ns>` and `kubectl get pods -l app=checkout-api -n <prod‑ns>`. | A failed rollout (e.g., pods stuck in *Pending* or *CrashLoopBackOff*) can cause the load balancer to return 502. | Look for any pods not in *Running*/*Ready* state. |
+| **3. Inspect readiness‑probe status** | `kubectl describe pod <pod‑name>` and examine the *Readiness* events. | Pods that fail the readiness probe are **not** supposed to receive traffic; if they are still being sent traffic, the LB may return 502. | Note any “Readiness probe failed” messages and the count of failures. |
+| **4. Review application start‑up logs** | Pull logs from the newly‑started pods (`kubectl logs <pod‑name> -n <prod‑ns>`). | Startup errors (missing env vars, secret load failures, dependency time‑outs) often surface as 502s. | Search for errors about configuration, missing variables, or failed connections to downstream services. |
+| **5. Verify env vars & secrets** | Compare the environment block of the new deployment with the known‑good version (e.g., `kubectl get deployment checkout-api -o yaml`). | A missing or malformed variable/secret can break the service before it becomes ready. | Look for absent `PAYMENT_GATEWAY_URL`, DB credentials, Redis endpoint, etc. |
+| **6. Test downstream connectivity** | From a pod, run simple connectivity checks (e.g., `curl -sSf http://payment-gateway/health`, `psql -c '\l' $DB_URL`). | If the API cannot reach the Payment Gateway or Orders DB, it will return 502 to the client. | Confirm successful responses; note any time‑outs or authentication failures. |
+| **7. Quantify error rate** | In your monitoring system, check the 502 rate over the last 5 min. | The runbook says: *if the error rate stays > 5 % for five minutes, a rollback is warranted.* | If the rate is below that threshold, continue investigation; if above, prepare for rollback. |
+| **8. Decide on rollback** | If steps 1‑7 point to the new image (e.g., readiness failures, missing env vars, downstream connection errors) and the error rate criterion is met, initiate the rollback per SOP [INTERNAL 5]. | Rolling back restores the last known healthy image while preserving logs for post‑mortem. | Follow the **Pre‑rollback checks** (capture logs, announce, verify migrations) then execute the platform’s approved rollback command. |
+| **9. Preserve logs & avoid pod churn** | Do **not** delete or recreate pods repeatedly (runbook caution [INTERNAL 3]). | Deleting pods can erase the evidence you need for root‑cause analysis. | Keep the failing pods alive until logs/events are captured. |
+| **10. Escalate if needed** | • If the load balancer reports no healthy pods despite passing readiness checks → platform team. <br>• If connection‑pool errors persist after rollback → database team. | Escalation paths are defined in the runbook (see [INTERNAL 3]). | Provide the team with the logs/events you collected. |
+
+**Summary flow**
+
+1. **Time correlation** → 2. **K8s health** → 3. **Readiness probes** → 4. **App logs** → 5. **Env/secret check** → 6. **Downstream connectivity** → 7. **Error‑rate threshold** → 8. **Rollback (if warranted)** → 9. **Preserve evidence** → 10. **Escalate**.
+
+Proceed step‑by‑step; the moment you have a definitive link between the new image and the 502s (e.g., readiness‑probe failures caused by a missing env var), you can safely roll back using the SOP while retaining all diagnostic data.",checkout-api-runbook.md;payments-high-cpu-runbook.md;deployment-rollback-sop.md,3,checkout-api-runbook.md,"Correlate the incident start with the deployment timestamp. | Check Kubernetes deployment/pod status. | Inspect readiness-probe failures before restarting pods. | Review application logs for startup, dependency, or configuration errors. | Verify environment variables and secrets in the new deployment.",77.679,0,Private Runbooks,fully_supported,useful,False,False,,,,,False,,,
+20261016T122620Z,baseline_rag,Q05,direct,At what sustained error rate and duration should checkout-api be rolled back after a release?,"The runbook specifies that **if the new release is strongly correlated with the incident and the error rate stays above 5 % for five minutes, the checkout‑api should be rolled back to the last known healthy image**【Doc 1】.",checkout-api-runbook.md;checkout-api-runbook.md;checkout-api-runbook.md;deployment-rollback-sop.md;deployment-rollback-sop.md,5,checkout-api-runbook.md;deployment-rollback-sop.md,Roll back when the error rate remains above 5% for five minutes. | The new release must be strongly correlated with the incident. | Use the approved deployment rollback procedure.,4.777,0,internal_retrieval,,,,False,,639,143,782,True,,,
+20261016T122620Z,axiom_self_rag,Q05,direct,At what sustained error rate and duration should checkout-api be rolled back after a release?,"**Rollback trigger for checkout‑api**
+
+- **Error‑rate threshold:** > 5 % of requests  
+- **Sustained duration:** continuously for **5 minutes**  
+
+If the incident is strongly correlated with the most recent deployment and the error rate stays above this 5 % level for the full five‑minute window, initiate the approved rollback to the last known healthy image.",checkout-api-runbook.md,1,checkout-api-runbook.md;deployment-rollback-sop.md,Roll back when the error rate remains above 5% for five minutes. | The new release must be strongly correlated with the incident. | Use the approved deployment rollback procedure.,33.496,0,Private Runbooks,fully_supported,useful,False,False,,,,,False,,,
+20261016T122620Z,baseline_rag,Q06,direct,When should the checkout-api incident be escalated to the platform team?,The incident should be escalated to the platform team **when the load balancer cannot reach healthy checkout‑api pods even though the pods’ readiness checks are passing**【Doc 1】.,checkout-api-runbook.md;checkout-api-runbook.md;checkout-api-runbook.md;payments-high-cpu-runbook.md;payments-high-cpu-runbook.md,5,checkout-api-runbook.md,When the load balancer cannot reach healthy checkout-api pods even though readiness checks are passing.,5.573,0,internal_retrieval,,,,False,,546,126,672,True,,,
+20261016T122620Z,axiom_self_rag,Q06,direct,When should the checkout-api incident be escalated to the platform team?,"The checkout‑api incident should be escalated to the platform team **when the load balancer cannot reach healthy `checkout‑api` pods even though the pods’ readiness checks are still reporting as passing**. At that point the platform team takes over to investigate networking or load‑balancer problems.  
+
+The runbook also advises **not to delete pods repeatedly as a first response** and to **preserve logs and events** so the platform team has the necessary diagnostic information.",checkout-api-runbook.md,1,checkout-api-runbook.md,When the load balancer cannot reach healthy checkout-api pods even though readiness checks are passing.,51.643,2,Private Runbooks,partially_supported,useful,False,False,,,,,False,,,
+20261016T122620Z,baseline_rag,Q07,direct,When should a checkout-api incident be escalated to the database team?,A checkout‑api incident should be escalated to the **database team** **when connection‑pool errors persist even after the application has been rolled back**【Doc 1】.,checkout-api-runbook.md;checkout-api-runbook.md;checkout-api-runbook.md;payments-high-cpu-runbook.md;payments-high-cpu-runbook.md,5,checkout-api-runbook.md,When connection-pool errors continue even after the application has been rolled back.,8.658,0,internal_retrieval,,,,False,,546,110,656,True,,,
+20261016T122620Z,axiom_self_rag,Q07,direct,When should a checkout-api incident be escalated to the database team?,Escalate a checkout‑api incident to the database team **when connection‑pool errors persist after the checkout‑api deployment has been rolled back**【INTERNAL 1】. This condition is explicitly listed in the runbook as the trigger for involving the database team.,checkout-api-runbook.md,1,checkout-api-runbook.md,When connection-pool errors continue even after the application has been rolled back.,53.363,2,Private Runbooks,fully_supported,useful,False,False,,,,,False,,,
+20261016T122620Z,baseline_rag,Q08,multi_document,"After rolling back checkout-api for a post-deployment 502 incident, what must be verified and how long must things stay stable?","**What to verify after the rollback**
+
+- Confirm that the service is **ready** (readiness probes are passing).  
+- Check that the **error rate** is back to normal.  
+- Verify that **latency** is within expected limits.  
+- Run at least one **business‑level health check** (e.g., a checkout request that reaches the payment gateway and orders database).
+
+**How long it must stay stable**
+
+- Keep the incident open and continue monitoring until all of those metrics remain stable for **15 minutes**.  
+
+*Evidence:* The deployment‑rollback SOP states: “After rollback, verify readiness, error rate, latency, and at least one business-level health check. Keep the incident open until metrics remain stable for 15 minutes.”【Doc 3】.",checkout-api-runbook.md;checkout-api-runbook.md;deployment-rollback-sop.md;checkout-api-runbook.md;deployment-rollback-sop.md,5,checkout-api-runbook.md;deployment-rollback-sop.md,"Verify readiness, error rate, latency, and at least one business-level health check after rollback. | Keep the incident open until metrics remain stable for 15 minutes. | Use the approved rollback procedure rather than manually editing production containers.",4.207,0,internal_retrieval,,,,False,,648,284,932,True,,,
+20261016T122620Z,axiom_self_rag,Q08,multi_document,"After rolling back checkout-api for a post-deployment 502 incident, what must be verified and how long must things stay stable?","**Verification steps after the rollback**
+
+1. **Readiness** – Confirm the checkout‑api pods report *Ready* (readiness probe passes) and are receiving traffic.  
+2. **Error rate** – Ensure the 5xx/502 error rate has dropped back to normal (well below the 5 % threshold).  
+3. **Latency** – Check that request latency is within the service’s SLA range.  
+4. **Business‑level health** – Run at least one functional health check that exercises a core checkout flow (e.g., a successful checkout request that reaches the Payment Gateway and writes to the Orders database).
+
+**Stability window**
+
+- Keep the incident open and continue monitoring these metrics until they remain stable for **15 minutes**. Only then can the incident be closed.  
+
+*(Source: INTERNAL 3 – “After rollback, verify readiness, error rate, latency, and at least one business‑level health check. Keep the incident open until metrics remain stable for 15 minutes.”)*",checkout-api-runbook.md;deployment-rollback-sop.md,2,checkout-api-runbook.md;deployment-rollback-sop.md,"Verify readiness, error rate, latency, and at least one business-level health check after rollback. | Keep the incident open until metrics remain stable for 15 minutes. | Use the approved rollback procedure rather than manually editing production containers.",47.364,0,Private Runbooks,fully_supported,useful,False,False,,,,,False,,,
+20261016T122620Z,baseline_rag,Q09,multi_document,"The checkout-api error rate is above 5% five minutes after a deploy. What does the checkout runbook recommend, and which procedure does it point to?","The runbook says that if the new release is strongly correlated with the incident **and the error rate stays above 5 % for five minutes**, you should **roll back to the last known healthy image**. It points you to use the **approved deployment‑rollback procedure**.",checkout-api-runbook.md;checkout-api-runbook.md;payments-high-cpu-runbook.md;checkout-api-runbook.md;payments-high-cpu-runbook.md,5,checkout-api-runbook.md;deployment-rollback-sop.md,Roll back to the last known healthy image. | The runbook references the approved deployment rollback procedure. | Trigger condition is error rate above 5% for five minutes strongly correlated with the new release.,5.665,0,internal_retrieval,,,,False,,677,212,889,True,,,
+20261016T122620Z,axiom_self_rag,Q09,multi_document,"The checkout-api error rate is above 5% five minutes after a deploy. What does the checkout runbook recommend, and which procedure does it point to?","**Runbook recommendation**
+
+- Because the error rate stays > 5 % for five minutes after the deployment, the checkout‑api runbook tells you to **roll back the service to the last known healthy container image**.
+
+**Procedure referenced**
+
+- Perform the rollback by following the **“approved deployment rollback procedure.”** (the runbook points to that specific rollback process for production releases.)  
+
+*Source: step 7 in the checkout‑api runbook – “If the new release is strongly correlated with the incident and the error rate remains above 5 % for five minutes, roll back to the last known healthy image using the approved deployment rollback procedure.”*",checkout-api-runbook.md;payments-high-cpu-runbook.md,2,checkout-api-runbook.md;deployment-rollback-sop.md,Roll back to the last known healthy image. | The runbook references the approved deployment rollback procedure. | Trigger condition is error rate above 5% for five minutes strongly correlated with the new release.,43.195,0,Private Runbooks,fully_supported,useful,False,False,,,,,False,,,
+20261016T122620Z,baseline_rag,Q10,ambiguous,"It is failing right after the deploy, what should I do?","Based on the runbooks you have, the recommended first‑response workflow when a service starts failing **immediately after a deployment** is:
+
+1. **Correlate the incident with the deployment**  
+   * Compare the incident start time to the timestamp of the most recent deployment (Doc 1, step 1).  
+
+2. **Validate the Kubernetes deployment**  
+   * Check the status of the `checkout‑api` deployment and its pods (Doc 1, step 2).  
+   * Look at the readiness‑probe results – any pod that is failing readiness must not be receiving production traffic (Doc 1, step 3).  
+
+3. **Gather diagnostic data before taking any destructive action**  
+   * Preserve the pod logs and Kubernetes events; do **not** delete pods repeatedly (Doc 2).  
+   * Review the latest application logs for startup, dependency, or configuration errors (Doc 1, step 4).  
+   * Verify that all required environment variables and secrets are present in the new deployment (Doc 1, step 5).  
+
+4. **Check external dependencies**  
+   * Test connectivity from `checkout‑api` to the Payment Gateway and the Orders PostgreSQL database (Doc 1, step 6).  
+
+5. **Determine whether a rollback is warranted**  
+   * If the new release is strongly correlated with the incident **and** the error rate stays above 5 % for at least five minutes, initiate a rollback (Doc 1, step 7).  
+
+6. **Perform the rollback using the approved SOP**  
+   * Follow the “Production Deployment Rollback SOP” (Doc 5):  
+     - Confirm the currently deployed image and the last known healthy version.  
+     - Capture logs, events, and dashboard screenshots.  
+     - Announce the rollback in the incident channel.  
+     - Verify that any database migrations are backward‑compatible.  
+     - Use the platform’s approved rollback command to restore the previous healthy image (do not edit containers manually).  
+
+7. **Escalate if needed**  
+   * If the load balancer cannot reach healthy pods even though readiness checks are passing, escalate to the platform team (Doc 2).  
+   * If connection‑pool errors persist after a rollback, involve the database team (Doc 2).  
+
+Follow these steps in order; they are the documented procedure for a failure that occurs right after a deployment. If after completing the above checks the problem is still unresolved, the next step is to open an escalation as described.",checkout-api-runbook.md;checkout-api-runbook.md;payments-high-cpu-runbook.md;checkout-api-runbook.md;deployment-rollback-sop.md,5,,The service and symptoms are not identified. | A good answer asks which service and what the symptoms are (for example 502 errors versus high CPU). | It must not assert a specific runbook action for an unknown service.,7.606,0,internal_retrieval,,,,False,,738,674,1412,True,,,
+20261016T122620Z,axiom_self_rag,Q10,ambiguous,"It is failing right after the deploy, what should I do?","**What to do when the service fails right after a deploy**
+
+1. **Confirm the timing correlation** – Compare the moment the incident began with the timestamp of the most recent `checkout‑api` deployment. If the failure started immediately after the release, the deployment is a strong candidate for the cause (INTERNAL 1 §1).
+
+2. **Look at the Kubernetes deployment and pod status** – Run the usual `kubectl get deployment checkout-api …` and `kubectl get pods -l app=checkout-api …` commands and note the desired replica count, rollout status, and the phase of each pod (INTERNAL 1 §2).
+
+3. **Check readiness‑probe results** – Use `kubectl describe pod <pod>` and examine the readiness‑probe section. A pod that fails its readiness probe will not receive production traffic (INTERNAL 1 §3). The runbook also notes that 502 responses can appear when the load balancer cannot reach a healthy pod after a release (INTERNAL 4).
+
+4. **Collect the newest pod logs** – Pull the startup logs of the most recent pods, e.g. `kubectl logs <pod> -c checkout-api`. Look for errors such as missing or malformed environment variables, secret‑mount problems, or failures to reach external dependencies (INTERNAL 1 §4).
+
+5. **Validate configuration and secrets** – Verify that every required environment variable and Kubernetes secret is present and correctly mounted in the new deployment (INTERNAL 1 §5).
+
+6. **Test external connectivity from a healthy pod** – From a running pod (or a temporary debug pod) try to reach the Payment Gateway, the Orders PostgreSQL database, Redis, etc. This confirms that the service can talk to its downstream dependencies (INTERNAL 1 §6).
+
+7. **Evaluate the error‑rate threshold** – If the 502 error rate stays **greater than 5 % for at least five minutes** and the checks above point to the new release, a rollback is justified (INTERNAL 1 §7).
+
+8. **Perform the rollback**  
+   *Pre‑rollback* – Capture the current application logs, Kubernetes events, and dashboard screenshots; announce the rollback in the incident channel; and verify that any database migrations are backward‑compatible (INTERNAL 5 §Pre‑rollback).  
+   *Rollback* – Execute the approved rollback command, for example `kubectl rollout undo deployment/checkout-api`, which restores the last known healthy image (INTERNAL 5 §Rollback). Do not edit containers manually.
+
+9. **Verify that the service has recovered** – After the rollback, repeat steps 2‑4 to ensure pods become Ready and that the 502 error rate returns to normal. Continue monitoring for a few minutes.
+
+---
+
+### When to escalate  
+
+* If the load balancer cannot reach healthy `checkout‑api` pods even though readiness checks are passing, page the **platform team** (INTERNAL 2).  
+* If connection‑pool or database errors persist after a successful rollback, page the **database team** (INTERNAL 2).
+
+---
+
+### Cautions  
+
+* Preserve logs and events before deleting or recreating pods; do not delete pods repeatedly as a first response (INTERNAL 2).  
+* Ensure database migrations are backward‑compatible before rolling back application code (INTERNAL 5).
+
+Following this ordered checklist lets you quickly determine whether the post‑deployment failure is caused by the new release and, if so, safely revert to a stable version while retaining all diagnostic information.",checkout-api-runbook.md;payments-high-cpu-runbook.md;deployment-rollback-sop.md,3,,The service and symptoms are not identified. | A good answer asks which service and what the symptoms are (for example 502 errors versus high CPU). | It must not assert a specific runbook action for an unknown service.,156.646,2,Private Runbooks,fully_supported,useful,False,False,,,,,False,,,
+20261016T122620Z,baseline_rag,Q11,ambiguous,"CPU is high, should I add more replicas?","**Answer (based only on the supplied evidence)**  
+
+When you see high CPU you should **not immediately add more replicas**. Follow the procedure outlined in the *Payments Service High CPU Runbook*:
+
+1. **Confirm the cause** – check whether traffic volume has risen abnormally or whether a single replica is hotter than the others (which could indicate a stuck worker or uneven traffic distribution).  
+2. **Validate service health** – look at application latency, request rate, error rate and queue depth.  
+3. **Inspect recent changes** – review the latest deployment, feature‑flag changes, and logs for retry storms, timeout loops, serialization errors, or unusually expensive requests.  
+
+- **If the service is healthy** and the high CPU is simply due to insufficient capacity, then **scale the number of replicas** in line with the approved production autoscaling limits (step 6 of the response procedure).  
+- **If the high CPU started right after a deployment** and customer impact is growing, the runbook advises using the **rollback procedure** instead of scaling a potentially faulty release (step 7).  
+
+So, add more replicas **only after** you have confirmed that the service is healthy and that the CPU pressure is not caused by a deployment issue or an uneven load. Otherwise, investigate and possibly roll back before scaling.",payments-high-cpu-runbook.md;payments-high-cpu-runbook.md;payments-high-cpu-runbook.md;checkout-api-runbook.md;checkout-api-runbook.md,5,,"The service is not identified, so the correct runbook is unclear. | A good answer asks which service and notes that scaling should only follow confirming latency, request rate, error rate, and queue depth. | It should not blindly recommend scaling.",6.423,0,internal_retrieval,,,,False,,589,389,978,True,,,
+20261016T122620Z,axiom_self_rag,Q11,ambiguous,"CPU is high, should I add more replicas?",,,0,,"The service is not identified, so the correct runbook is unclear. | A good answer asks which service and notes that scaling should only follow confirming latency, request rate, error rate, and queue depth. | It should not blindly recommend scaling.",24.369,,,,,,True,"RateLimitError: Error code: 429 - {'error': {'message': 'Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kntdty0qexw94v6hqjx1paqa` service tier `on_demand` on tokens per minute (TPM): Limit 8000, Used 6314, Requested 1985. Please try again in 2.242499999s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}",,,,False,,,
+20261016T122620Z,baseline_rag,Q12,direct,What are the trigger conditions for the payments service high CPU runbook?,"The runbook should be started when **either** of the following conditions is met:
+
+* The average CPU utilization for the payments service stays **above 85 % for 10 minutes**, **or**  
+* **Latency begins to rise** at the same time the CPU is saturated.  
+
+(These trigger conditions are taken directly from the “Trigger” section of the Payments Service High CPU runbook.)",payments-high-cpu-runbook.md;payments-high-cpu-runbook.md;checkout-api-runbook.md;payments-high-cpu-runbook.md;checkout-api-runbook.md,5,payments-high-cpu-runbook.md,"Average CPU utilization above 85% for 10 minutes, or latency rising together with CPU saturation.",2.526,0,internal_retrieval,,,,False,,618,164,782,True,,,
+20261016T122620Z,axiom_self_rag,Q12,direct,What are the trigger conditions for the payments service high CPU runbook?,"**Trigger conditions for the Payments Service High‑CPU runbook**
+
+- **CPU‑utilization trigger:** Average CPU usage for the payments service stays **above 85 % for 10 minutes**.  
+- **Latency‑CPU trigger:** CPU saturation **accompanied by a rise in request latency**.",payments-high-cpu-runbook.md,1,payments-high-cpu-runbook.md,"Average CPU utilization above 85% for 10 minutes, or latency rising together with CPU saturation.",34.226,0,Private Runbooks,fully_supported,useful,False,False,,,,,False,,,
+20261016T122620Z,baseline_rag,Q13,direct,What should be checked before scaling the payments service during high CPU?,"Before you add more replicas to the payments service, you should first verify the service’s health metrics:
+
+* **Application latency** – is response time rising?  
+* **Request rate** – has traffic volume spiked unexpectedly?  
+* **Error rate** – are errors increasing?  
+* **Queue depth** – are request queues building up?
+
+These checks are listed in the “Response procedure” of the Payments Service High‑CPU runbook【Doc 1】.",payments-high-cpu-runbook.md;payments-high-cpu-runbook.md;checkout-api-runbook.md;payments-high-cpu-runbook.md;checkout-api-runbook.md,5,payments-high-cpu-runbook.md,"Application latency, request rate, error rate, and queue depth should be checked before scaling.",7.582,0,internal_retrieval,,,,False,,592,244,836,True,,,
+20261016T122620Z,axiom_self_rag,Q13,direct,What should be checked before scaling the payments service during high CPU?,"**Before scaling the payments service when CPU spikes, verify the following basics:**
+
+1. **Metric validation**  
+   - Confirm the CPU reading is sustained (e.g., > 80 % for several minutes) and not a transient spike.  
+   - Check related metrics: memory usage, request latency, error rates, queue lengths, and downstream service health.
+
+2. **Application bottlenecks**  
+   - Look for hot code paths, inefficient queries, or thread‑pool exhaustion in logs or APM traces.  
+   - Ensure there are no runaway background jobs or scheduled tasks consuming CPU.
+
+3. **Resource limits & quotas**  
+   - Verify current pod/container limits (CPU requests/limits, cgroup caps) and that they’re not artificially throttling the service.  
+   - Check cloud‑provider or orchestrator quotas that might block additional instances.
+
+4. **Autoscaling configuration**  
+   - Review Horizontal Pod Autoscaler (HPA) or equivalent rules: target CPU utilization, min/max replica counts, and scaling cooldown periods.  
+   - Ensure the scaling policy is enabled and correctly references the payments deployment.
+
+5. **Downstream dependencies**  
+   - Confirm databases, caches, and external APIs have capacity to handle increased request volume.  
+   - Check for back‑pressure signals (e.g., queue buildup) that could be the real limiter.
+
+6. **Network & I/O**  
+   - Examine network latency, socket exhaustion, and disk I/O metrics; high CPU can be a symptom of I/O throttling.
+
+7. **Recent changes**  
+   - Identify any recent code releases, configuration updates, or infrastructure changes that might have introduced the load pattern.
+
+8. **Health checks & readiness**  
+   - Ensure liveness/readiness probes are passing; failing probes can cause rapid pod churn that masks the real issue.
+
+9. **Scaling impact assessment**  
+   - Verify that scaling the service won’t exceed licensing limits, cost budgets, or violate any service‑level agreements for downstream systems.
+
+Once these checks confirm that CPU is the true constraint and that the environment can safely accommodate more instances, proceed with scaling (manual or via autoscaler).",,0,payments-high-cpu-runbook.md,"Application latency, request rate, error rate, and queue depth should be checked before scaling.",3.246,0,General Knowledge,,,False,False,,,,,False,,,
+20261016T122620Z,baseline_rag,Q14,direct,What can a single hot payments replica indicate?,A single hot payments replica can indicate that a worker is stuck or that traffic is being distributed unevenly across the replicas.,payments-high-cpu-runbook.md;payments-high-cpu-runbook.md;checkout-api-runbook.md;deployment-rollback-sop.md;checkout-api-runbook.md,5,payments-high-cpu-runbook.md,A stuck worker or uneven traffic distribution.,10.954,0,internal_retrieval,,,,False,,686,80,766,True,,,
+20261016T122620Z,axiom_self_rag,Q14,direct,What can a single hot payments replica indicate?,"A single “hot” payments replica can indicate that the workload is not being balanced correctly. According to the payments‑high‑cpu‑runbook, one hot replica may be a sign of **a stuck worker on that replica** or **uneven traffic distribution that gives that replica a disproportionate share of the load**.",payments-high-cpu-runbook.md,1,payments-high-cpu-runbook.md,A stuck worker or uneven traffic distribution.,37.784,1,Private Runbooks,fully_supported,useful,False,False,,,,,False,,,
+20261016T122620Z,baseline_rag,Q15,paraphrased,One payments pod is pegged near full CPU while the other replicas look normal. What does that pattern suggest and what is the next step?,"**What the pattern suggests**  
+Seeing only one payments pod running at near‑full CPU while the other replicas are idle or normal is a classic sign that the problem is **not a sudden traffic surge** but rather something happening inside that single replica – e.g., a stuck worker thread, a runaway request, or an uneven traffic‑routing issue that is sending a disproportionate share of load to that pod.
+
+**What to do next**  
+The runbook tells you to act on that observation immediately:
+
+1. **Confirm the cause of the hot replica** – look for a stuck worker or uneven traffic distribution.  
+2. Start by checking the pod’s logs and metrics for signs of retry storms, timeout loops, serialization errors, or unusually expensive requests (step 5 of the Payments high‑CPU runbook).  
+
+In short: the single‑hot‑replica pattern points to a stuck/inefficient worker or load‑balancing imbalance, and the next step is to investigate the pod’s internal behavior (logs, request patterns, and queue depth) to confirm and remediate the issue.",payments-high-cpu-runbook.md;payments-high-cpu-runbook.md;checkout-api-runbook.md;checkout-api-runbook.md;checkout-api-runbook.md,5,payments-high-cpu-runbook.md,Compare CPU usage across replicas. | A single hot replica can indicate a stuck worker or uneven traffic distribution. | Investigate before scaling.,7.056,0,internal_retrieval,,,,False,,673,441,1114,True,,,
+20261016T122620Z,axiom_self_rag,Q15,paraphrased,One payments pod is pegged near full CPU while the other replicas look normal. What does that pattern suggest and what is the next step?,"**What the pattern suggests**  
+When only one replica of the payments service is near‑full CPU while the other replicas show normal usage, the payments‑high‑CPU runbook notes that this “one hot replica can indicate a **stuck worker** or **uneven traffic distribution**.”【INTERNAL 1†L2-L3】
+
+**Next step** – follow the runbook sequence for a payments‑high‑CPU incident:
+
+1. **Confirm traffic volume** – Verify whether overall traffic has increased abnormally【INTERNAL 1†L1】.  
+2. **Compare CPU usage across replicas** – You have already observed the single hot replica; this comparison is the trigger for the subsequent checks【INTERNAL 1†L2】.  
+3. **Check application health metrics** – Review latency, request rate, error rate, and queue depth before taking any scaling action【INTERNAL 1†L3】.  
+4. **Inspect recent deployments and feature‑flag changes** – Determine if a new release or flag change coincides with the CPU rise【INTERNAL 1†L4】.  
+5. **Review pod logs** – Look for retry storms, timeout loops, serialization errors, or any unusually expensive request that could be looping【INTERNAL 1†L5】.  
+
+**If the service is otherwise healthy** – scale the payments service within the approved production autoscaling limit, as the runbook advises when capacity is insufficient【INTERNAL 1†L6】.  
+
+**If high CPU began directly after a deployment** – use the rollback procedure rather than continuing to scale a potentially faulty release【INTERNAL 1†L7】.  
+
+Proceed through the remaining steps of the payments‑high‑CPU runbook (confirm root cause, apply the appropriate remediation, and monitor post‑remediation metrics).",payments-high-cpu-runbook.md;checkout-api-runbook.md,2,payments-high-cpu-runbook.md,Compare CPU usage across replicas. | A single hot replica can indicate a stuck worker or uneven traffic distribution. | Investigate before scaling.,93.275,2,Private Runbooks,fully_supported,useful,False,False,,,,,False,,,
+20261016T122620Z,baseline_rag,Q16,direct,What patterns in the logs should you look for when diagnosing payments high CPU?,"When investigating a Payments service that is experiencing high CPU, the runbook advises you to **review the logs for**:
+
+- **Retry storms** – many repeated attempts to process the same request.  
+- **Timeout loops** – repeated cycles where operations time out and are retried.  
+- **Serialization errors** – failures while converting data that may cause repeated processing.  
+- **Unusually expensive requests** – requests that take far longer or consume far more resources than normal.  
+
+These log patterns can indicate why the CPU is being saturated.",payments-high-cpu-runbook.md;payments-high-cpu-runbook.md;checkout-api-runbook.md;checkout-api-runbook.md;payments-high-cpu-runbook.md,5,payments-high-cpu-runbook.md,"Retry storms, timeout loops, serialization errors, and unusually expensive requests.",4.158,0,internal_retrieval,,,,False,,594,176,770,True,,,
+20261016T122620Z,axiom_self_rag,Q16,direct,What patterns in the logs should you look for when diagnosing payments high CPU?,"**Log patterns to look for when diagnosing a Payments high‑CPU event**  
+*(as listed in payments‑high‑cpu‑runbook.md)*  
+
+- **Retry storms** – many rapid, repeated request attempts that can flood the service.  
+- **Timeout loops** – requests that repeatedly hit time‑outs and are retried, creating a tight processing loop.  
+- **Serialization errors** – failures while encoding or decoding data that trigger retries or fallback logic.  
+- **Unusually expensive requests** – any request that takes significantly longer than typical or consumes a disproportionate amount of CPU.  
+
+The runbook advises that spotting any of these patterns in the logs should prompt further investigation (e.g., correlating with traffic spikes, recent deployments, or feature‑flag changes) to determine the cause of the CPU pressure.",payments-high-cpu-runbook.md,1,payments-high-cpu-runbook.md,"Retry storms, timeout loops, serialization errors, and unusually expensive requests.",47.131,1,Private Runbooks,fully_supported,useful,False,False,,,,,False,,,
+20261016T122620Z,baseline_rag,Q17,direct,What is the safety rule about CPU limits during a payments incident?,The safety rule states that **you must not disable CPU limits or remove any production resource controls during a payments incident unless you have explicit approval from the platform team**.,payments-high-cpu-runbook.md;payments-high-cpu-runbook.md;payments-high-cpu-runbook.md;checkout-api-runbook.md;checkout-api-runbook.md,5,payments-high-cpu-runbook.md,Do not disable CPU limits or remove production resource controls during an incident without platform-team approval.,2.155,0,internal_retrieval,,,,False,,592,131,723,True,,,
+20261016T122620Z,axiom_self_rag,Q17,direct,What is the safety rule about CPU limits during a payments incident?,,,0,payments-high-cpu-runbook.md,Do not disable CPU limits or remove production resource controls during an incident without platform-team approval.,6.608,,,,,,True,"RateLimitError: Error code: 429 - {'error': {'message': 'Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kntdty0qexw94v6hqjx1paqa` service tier `on_demand` on tokens per minute (TPM): Limit 8000, Used 6551, Requested 1843. Please try again in 2.955s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}",,,,False,,,
+20261016T122620Z,baseline_rag,Q18,multi_document,Payments CPU spiked right after a deployment and customer impact is increasing. What should be done instead of scaling the faulty release?,"The runbook says that when CPU spikes start immediately after a deployment and the impact on customers is growing, you should **roll back the faulty release** (follow the approved deployment‑rollback procedure) rather than adding more replicas or otherwise scaling the service.",payments-high-cpu-runbook.md;checkout-api-runbook.md;payments-high-cpu-runbook.md;checkout-api-runbook.md;payments-high-cpu-runbook.md,5,payments-high-cpu-runbook.md;deployment-rollback-sop.md,Use the rollback procedure rather than continuing to scale a faulty release. | Rollback is appropriate when a new version is strongly correlated with a customer-impacting regression. | Pre-rollback checks must be performed.,7.642,0,internal_retrieval,,,,False,,604,146,750,True,,,
+20261016T122620Z,axiom_self_rag,Q18,multi_document,Payments CPU spiked right after a deployment and customer impact is increasing. What should be done instead of scaling the faulty release?,"**What to do:** Rollback the Payments service to the last known‑good release instead of adding more replicas.
+
+**Why this is the correct response**  
+The *payments‑high‑cpu‑runbook* specifies that when CPU usage spikes **directly after a deployment** and customer impact is increasing, the prescribed action is to **use the rollback procedure rather than continue scaling the faulty release**【INTERNAL 1】.
+
+**Supported steps (taken directly from the runbook)**  
+
+1. **Confirm the trigger** – Verify that the CPU spike coincides with the timestamp of the most recent deployment【INTERNAL 1】.  
+2. **Gather context** – Check traffic volume, per‑replica CPU, latency, request/error rates, and queue depth to rule out a traffic surge as the cause【INTERNAL 1】.  
+3. **Inspect logs** – Look for retry storms, timeout loops, serialization errors, or unusually expensive requests that may have been introduced by the new code【INTERNAL 1】.  
+4. **Execute the approved rollback** – Revert the Payments service to the previous stable container image using the organization’s standard deployment‑rollback procedure (the runbook calls this “the rollback procedure”)【INTERNAL 1】.  
+5. **Monitor after rollback** – Observe CPU utilization, latency, and error metrics to confirm they return to normal levels【INTERNAL 1】.  
+
+**Caution**  
+The runbook explicitly advises **not to scale the service while the faulty release is running**, because scaling only masks the underlying bug and can worsen customer impact【INTERNAL 1】. Preserve logs and events before the rollback for later post‑mortem analysis, as recommended in the checkout‑api runbook【INTERNAL 2】.",payments-high-cpu-runbook.md;checkout-api-runbook.md,2,payments-high-cpu-runbook.md;deployment-rollback-sop.md,Use the rollback procedure rather than continuing to scale a faulty release. | Rollback is appropriate when a new version is strongly correlated with a customer-impacting regression. | Pre-rollback checks must be performed.,100.381,2,Private Runbooks,partially_supported,useful,False,False,,,,,False,,,
+20261016T122620Z,baseline_rag,Q19,direct,Is there any limit on how many payments replicas can be added during high CPU?,"Yes. When the Payments service is healthy but its capacity is insufficient, you should “scale replicas according to the approved production autoscaling limit”【Doc 1】. This indicates that there is a defined limit on how many replicas you may add, and you must stay within that approved autoscaling ceiling. The runbook does not give a specific numeric value—only that scaling must respect the existing production autoscaling limits.",payments-high-cpu-runbook.md;payments-high-cpu-runbook.md;payments-high-cpu-runbook.md;checkout-api-runbook.md;checkout-api-runbook.md,5,payments-high-cpu-runbook.md,Scale replicas according to the approved production autoscaling limit. | Scaling should only happen if the service is healthy but capacity is insufficient.,3.955,0,internal_retrieval,,,,False,,595,204,799,True,,,
+20261016T122620Z,axiom_self_rag,Q19,direct,Is there any limit on how many payments replicas can be added during high CPU?,"**Yes – you can only add replicas up to the **approved production autoscaling limit** for the Payments service.**  
+
+The *payments‑high‑cpu‑runbook* instructs you to:
+
+1. Verify that the service is healthy (traffic, latency, error rates, queue depth, etc.).  
+2. If the service is healthy but CPU capacity is still insufficient, **scale replicas only within the pre‑approved autoscaling ceiling** for production.  
+
+So, before adding more replicas, check the configuration or the autoscaling policy that defines that ceiling (e.g., the maximum replica count set in your Horizontal Pod Autoscaler, Cloud Run service, or equivalent). Do not exceed that limit; if you need more capacity, you must request a limit increase through the change‑management process.  
+
+*Note:* If high CPU started right after a deployment, consider rolling back the release instead of scaling further.",payments-high-cpu-runbook.md,1,payments-high-cpu-runbook.md,Scale replicas according to the approved production autoscaling limit. | Scaling should only happen if the service is healthy but capacity is insufficient.,39.127,0,Private Runbooks,fully_supported,useful,False,False,,,,,False,,,
+20261016T122620Z,baseline_rag,Q20,direct,When is a production rollback considered appropriate?,"A production rollback is triggered when the new code that has just been released is directly tied to a customer‑impacting problem and fixing it by another means (for example, a quick configuration change) would not be faster.
+
+* The **Production Deployment Rollback SOP** states:  
+  “A rollback is appropriate **when a newly deployed version is strongly correlated with a customer‑impacting regression and recovery through a safe configuration change is not faster**.”【Doc 1】
+
+* The **checkout‑api runbook** adds concrete thresholds:  
+  “If the new release is strongly correlated with the incident **and the error rate remains above 5 % for five minutes**, roll back to the last known healthy image.”【Doc 2】
+
+* The **payments‑high‑CPU runbook** reinforces the same principle for performance‑related regressions:  
+  “If high CPU began directly after a deployment **and customer impact is increasing**, use the rollback procedure rather than continuing to scale a faulty release.”【Doc 4】
+
+**In short:** A rollback is considered appropriate when the latest deployment is clearly linked to a regression that is affecting customers (e.g., sustained high error rate, rising CPU‑related impact) and a quicker, safe fix via configuration change is not available.",deployment-rollback-sop.md;checkout-api-runbook.md;checkout-api-runbook.md;payments-high-cpu-runbook.md;deployment-rollback-sop.md,5,deployment-rollback-sop.md,When a newly deployed version is strongly correlated with a customer-impacting regression. | And recovery through a safe configuration change is not faster than a rollback.,7.353,0,internal_retrieval,,,,False,,677,466,1143,True,,,
+20261016T122620Z,axiom_self_rag,Q20,direct,When is a production rollback considered appropriate?,"A production rollback is appropriate when the change that’s been deployed creates a **significant, unmitigated risk** to the service or its users. Typical triggers include:
+
+- **Critical functional failures** – core features are broken or the application crashes.
+- **Severe performance degradation** – latency, error rates, or resource exhaustion exceed acceptable thresholds.
+- **Data integrity or loss** – corruption, incorrect calculations, or unintended data deletions occur.
+- **Security breaches** – new vulnerabilities, privilege escalations, or exposure of sensitive data are introduced.
+- **Failed deployment steps** – incomplete migrations, missing dependencies, or configuration errors that prevent the system from starting.
+- **Negative business impact** – loss of revenue, breach of SLAs, or regulatory non‑compliance caused by the change.
+
+In practice, teams decide to roll back when:
+
+1. **Monitoring/alerts** show the issue is beyond a predefined severity level.
+2. **Root‑cause analysis** indicates the problem is directly tied to the recent change.
+3. **Mitigation** (feature flags, hotfixes, scaling) cannot be applied quickly enough to meet reliability or compliance requirements.
+4. The **cost of staying live** (customer impact, financial loss, reputational damage) outweighs the cost of reverting.
+
+If these conditions are met, initiating the rollback—using the documented, tested revert procedure—is the safest way to restore service stability.",,0,deployment-rollback-sop.md,When a newly deployed version is strongly correlated with a customer-impacting regression. | And recovery through a safe configuration change is not faster than a rollback.,2.804,0,General Knowledge,,,False,False,,,,,False,,,
+20261016T122620Z,baseline_rag,Q21,direct,What are the pre-rollback checks in the deployment rollback SOP?,"The pre‑rollback checks listed in the Deployment Rollback SOP are:
+
+- Confirm the currently deployed image/version and the last known healthy version.  
+- Capture relevant application logs, Kubernetes events, and dashboard screenshots.  
+- Announce the rollback in the incident channel.  
+- Verify that database migrations are backward‑compatible before rolling back application code.",deployment-rollback-sop.md;checkout-api-runbook.md;deployment-rollback-sop.md;payments-high-cpu-runbook.md;checkout-api-runbook.md,5,deployment-rollback-sop.md,"Confirm the currently deployed image/version and the last known healthy version. | Capture relevant application logs, Kubernetes events, and dashboard screenshots. | Announce the rollback in the incident channel. | Verify that database migrations are backward-compatible before rolling back application code.",8.561,0,internal_retrieval,,,,False,,682,203,885,True,,,
+20261016T122620Z,axiom_self_rag,Q21,direct,What are the pre-rollback checks in the deployment rollback SOP?,"**Pre‑rollback checks (from the Production Deployment Rollback SOP):**
+
+- Confirm the currently deployed image/version and the last known healthy version.  
+- Capture relevant application logs, Kubernetes events, and dashboard screenshots.  
+- Announce the rollback in the incident channel.  
+- Verify that database migrations are backward‑compatible before rolling back application code.",deployment-rollback-sop.md;checkout-api-runbook.md;payments-high-cpu-runbook.md,3,deployment-rollback-sop.md,"Confirm the currently deployed image/version and the last known healthy version. | Capture relevant application logs, Kubernetes events, and dashboard screenshots. | Announce the rollback in the incident channel. | Verify that database migrations are backward-compatible before rolling back application code.",38.157,0,Private Runbooks,fully_supported,useful,False,False,,,,,False,,,
+20261016T122620Z,baseline_rag,Q22,direct,Why does the rollback SOP require verifying that database migrations are backward-compatible?,"The provided documents list “Verify that database migrations are backward‑compatible before rolling back application code” as a required pre‑rollback check, but they do not explain the reason for that requirement. Therefore, the evidence does not contain an answer to why the rollback SOP includes this verification step.",deployment-rollback-sop.md;checkout-api-runbook.md;deployment-rollback-sop.md;checkout-api-runbook.md;payments-high-cpu-runbook.md,5,deployment-rollback-sop.md,Because application code may be rolled back while the database schema stays ahead. | The pre-rollback step exists to make sure rolling back the code is safe against the current schema.,8.031,0,internal_retrieval,,,,False,,683,314,997,True,,,
+20261016T122620Z,axiom_self_rag,Q22,direct,Why does the rollback SOP require verifying that database migrations are backward-compatible?,"The Production Deployment Rollback SOP lists **“Verify that database migrations are backward‑compatible before rolling back application code”** as a required pre‑rollback check【INTERNAL 1†L9-L13】.  
+
+The rollback step itself is defined as restoring **the last known healthy application image** and does not include any action to undo database migrations【INTERNAL 1†L15-L18】. Because the database schema will remain at the state created by the newer migrations, the application version that is redeployed must be able to run against that schema. Therefore, the SOP requires confirming backward compatibility of the migrations before the image is restored.",deployment-rollback-sop.md,1,deployment-rollback-sop.md,Because application code may be rolled back while the database schema stays ahead. | The pre-rollback step exists to make sure rolling back the code is safe against the current schema.,64.866,2,Private Runbooks,fully_supported,useful,False,False,,,,,False,,,
+20261016T122620Z,baseline_rag,Q23,paraphrased,We need to undo a bad release. What has to be captured and communicated before we roll back?,"Before initiating a rollback you must :
+
+* **Capture**  
+  * The relevant application logs.  
+  * Kubernetes events.  
+  * Dashboard screenshots (or any other UI‑level health views).  
+
+* **Communicate**  
+  * Announce the upcoming rollback in the incident channel so the team is aware of the action.
+
+These steps are listed in the “Pre‑rollback checks” of the Production Deployment Rollback SOP (Doc 1).",deployment-rollback-sop.md;checkout-api-runbook.md;checkout-api-runbook.md;payments-high-cpu-runbook.md;deployment-rollback-sop.md,5,deployment-rollback-sop.md,"Capture relevant application logs, Kubernetes events, and dashboard screenshots. | Announce the rollback in the incident channel. | Confirm current version and last known healthy version.",4.708,0,internal_retrieval,,,,False,,689,240,929,True,,,
+20261016T122620Z,axiom_self_rag,Q23,paraphrased,We need to undo a bad release. What has to be captured and communicated before we roll back?,"**What to capture & communicate before you initiate a rollback**
+
+| Category | What to capture | Why it’s needed |
+|----------|----------------|-----------------|
+| **Version state** | • Current deployed image / version<br>• Last known healthy image / version | Confirms you are rolling back to the correct baseline and provides a reference point for post‑mortem analysis. |
+| **Observability artifacts** | • Application logs (especially start‑up, dependency, and config errors)<br>• Kubernetes events (deployment, pod, and node events)<br>• Dashboard screenshots (e.g., Grafana/Prometheus views of error rate, latency, CPU, etc.) | Preserves the evidence that led to the rollback decision and helps later root‑cause investigation. |
+| **Incident communication** | • Post a clear “Rollback in progress” notice in the incident channel (include the target version you’re reverting to) | Keeps all responders and stakeholders aware of the action and prevents duplicate work. |
+| **Database migration check** | • Verify that any migrations applied in the bad release are backward‑compatible (or can be safely rolled back) | Prevents data‑integrity issues when the application code is reverted. |
+
+**Steps to follow (per the Production Deployment Rollback SOP)**  
+
+1. **Confirm versions** – Identify the currently running image and the last known healthy image.  
+2. **Capture logs & events** – Pull the relevant application logs, export Kubernetes events, and take screenshots of any monitoring dashboards showing the regression.  
+3. **Announce** – Send a rollback announcement in the incident channel, stating the reason and the target version.  
+4. **Validate DB migrations** – Ensure any schema or data changes introduced by the bad release can be rolled back or are safe to leave in place.  
+
+Only after these items are captured and communicated should you proceed with the approved rollback action.",deployment-rollback-sop.md;checkout-api-runbook.md;payments-high-cpu-runbook.md,3,deployment-rollback-sop.md,"Capture relevant application logs, Kubernetes events, and dashboard screenshots. | Announce the rollback in the incident channel. | Confirm current version and last known healthy version.",50.209,0,Private Runbooks,fully_supported,useful,False,False,,,,,False,,,
+20261016T122620Z,baseline_rag,Q24,direct,How should the actual rollback be performed?,"The rollback must be done with the **approved rollback action of the deployment platform**, not by hand‑editing containers.
+
+**Steps (as defined in the SOP):**
+
+1. **Invoke the platform’s rollback command** – tell the deployment system to revert the service to the *last known healthy image/version* (the image that was running before the problematic release).  
+2. **Do not manually edit or replace production containers** – let the platform perform the image swap so that all associated metadata, labels, and rollout tracking are preserved.
+
+After the rollback is triggered, continue with the post‑rollback verification (readiness, error‑rate, latency, and a business‑level health check) and keep the incident open until metrics are stable for at least 15 minutes.",deployment-rollback-sop.md;checkout-api-runbook.md;deployment-rollback-sop.md;checkout-api-runbook.md;payments-high-cpu-runbook.md,5,deployment-rollback-sop.md,Use the deployment platform's approved rollback action to restore the last known healthy application image. | Do not manually edit production containers.,6.359,0,internal_retrieval,,,,False,,677,292,969,True,,,
+20261016T122620Z,axiom_self_rag,Q24,direct,How should the actual rollback be performed?,"**How to perform the actual rollback**
+
+1. **Confirm you need a rollback**  
+   * Verify that the new `checkout‑api` release is strongly correlated with the incident (error‑rate > 5 % for ≥ 5 min).  
+   * Ensure the last known healthy image/version is identified (see *Pre‑rollback checks* in the Production Deployment Rollback SOP).
+
+2. **Run the approved rollback command**  
+   * From the deployment platform (e.g., your CI/CD or GitOps tool), invoke the **standard rollback action** that restores the previous image.  
+   * Example (generic) – do **not** edit containers manually:  
+
+   ```
+   <deployment‑tool> rollback checkout-api --to-image <healthy‑image‑tag>
+   ```
+
+   * The exact CLI/GUI step is defined in the platform’s “approved rollback action”; follow that exact procedure.
+
+3. **Post‑rollback verification**  
+   * After the rollback completes, check the Kubernetes deployment and pod status for `checkout-api`.  
+   * Confirm that readiness probes are passing and that pods are receiving traffic.  
+   * Re‑capture logs, events, and dashboard screenshots to document the state after rollback.
+
+4. **Communicate**  
+   * Announce in the incident channel that the rollback has been executed and share the new deployment version.
+
+5. **Cautions (from the SOP)**  
+   * **Do not** manually edit production containers or delete pods as a first response – preserve logs for diagnosis.  
+   * Verify that any database migrations are backward‑compatible before rolling back application code.  
+   * If the load balancer still cannot reach healthy pods after the rollback, **escalate to the platform team** (see the escalation section).  
+   * If connection‑pool errors persist after rollback, **escalate to the database team**.
+
+Following these steps uses the organization‑approved rollback mechanism and satisfies the safety checks outlined in the Production Deployment Rollback SOP.",deployment-rollback-sop.md;checkout-api-runbook.md,2,deployment-rollback-sop.md,Use the deployment platform's approved rollback action to restore the last known healthy application image. | Do not manually edit production containers.,51.961,0,Private Runbooks,fully_supported,useful,False,False,,,,,False,,,
+20261016T122620Z,baseline_rag,Q25,direct,"After a rollback, what verification is required and for how long must the incident stay open?","**Verification required after a rollback**  
+- Confirm that the service is **ready** (readiness probes are passing).  
+- Check that the **error rate** is back to normal.  
+- Verify that **latency** is within expected limits.  
+- Perform at least **one business‑level health check** to ensure the application is functioning correctly from a user‑impact perspective.  
+
+**How long the incident must remain open**  
+- Keep the incident open **until the metrics (readiness, error rate, latency, and the business health check) remain stable for 15 minutes**.",deployment-rollback-sop.md;checkout-api-runbook.md;deployment-rollback-sop.md;checkout-api-runbook.md;payments-high-cpu-runbook.md,5,deployment-rollback-sop.md,"Verify readiness, error rate, latency, and at least one business-level health check. | Keep the incident open until metrics remain stable for 15 minutes.",9.559,0,internal_retrieval,,,,False,,687,236,923,True,,,
+20261016T122620Z,axiom_self_rag,Q25,direct,"After a rollback, what verification is required and for how long must the incident stay open?",,,0,deployment-rollback-sop.md,"Verify readiness, error rate, latency, and at least one business-level health check. | Keep the incident open until metrics remain stable for 15 minutes.",1.104,,,,,,True,"OutputParserException: Failed to parse RetrieveDecision from completion {""description"": """", ""properties"": {""should_retrieve"": true}, ""required"": [""should_retrieve""], ""title"": ""RetrieveDecision"", ""type"": ""object""}. Got: 1 validation error for RetrieveDecision
+should_retrieve
+  Field required [type=missing, input_value={'description': '', 'prop...sion', 'type': 'object'}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.14/v/missing
+For troubleshooting, visit: https://docs.langchain.com/oss/python/langchain/errors/OUTPUT_PARSING_FAILURE ",,,,False,,,
+20261016T122620Z,baseline_rag,Q26,multi_document,Compare the stability window required after a rollback with the checkout-api condition that triggers a rollback.,"**Stability window after a rollback**  
+- The rollback SOP says that after a rollback you must “verify readiness, error rate, latency, and at least one business‑level health check. **Keep the incident open until metrics remain stable for 15 minutes**.”【Doc 4】
+
+**Checkout‑API condition that triggers a rollback**  
+- The checkout‑API runbook specifies that you should roll back “if the new release is strongly correlated with the incident **and the error rate remains above 5 % for five minutes**.”【Doc 1】
+
+**Comparison**  
+- The rollback is triggered when the error rate stays above 5 % for **five minutes**.  
+- After the rollback is performed, you must wait for **15 minutes** of stable metrics before closing the incident.  
+
+Thus, the post‑rollback stability window (15 minutes) is three times longer than the five‑minute error‑rate threshold that initiates the rollback.",checkout-api-runbook.md;checkout-api-runbook.md;deployment-rollback-sop.md;deployment-rollback-sop.md;checkout-api-runbook.md,5,deployment-rollback-sop.md;checkout-api-runbook.md,Post-rollback: metrics must remain stable for 15 minutes. | Checkout-api rollback trigger: error rate above 5% for five minutes. | These are two different time windows: 15 minutes stability versus 5 minutes of elevated errors.,8.691,0,internal_retrieval,,,,False,,640,390,1030,True,,,
+20261016T122620Z,axiom_self_rag,Q26,multi_document,Compare the stability window required after a rollback with the checkout-api condition that triggers a rollback.,,,0,deployment-rollback-sop.md;checkout-api-runbook.md,Post-rollback: metrics must remain stable for 15 minutes. | Checkout-api rollback trigger: error rate above 5% for five minutes. | These are two different time windows: 15 minutes stability versus 5 minutes of elevated errors.,94.97,,,,,,True,"RateLimitError: Error code: 429 - {'error': {'message': 'Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kntdty0qexw94v6hqjx1paqa` service tier `on_demand` on tokens per day (TPD): Limit 200000, Used 199385, Requested 790. Please try again in 1m15.6s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}",,,,False,,,
+20261016T122620Z,baseline_rag,Q27,multi_document,A release caused a customer-impacting regression and a config change would be slower to recover. What is the right move and what must be confirmed first?,,,0,deployment-rollback-sop.md;payments-high-cpu-runbook.md,"Perform a rollback because the new version is strongly correlated with a customer-impacting regression and a config change is not faster. | Complete the pre-rollback checks first. | If high CPU followed a deployment with growing customer impact, prefer rollback over continued scaling.",2.484,,,,,,True,"RateLimitError: Error code: 429 - {'error': {'message': 'Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kntdty0qexw94v6hqjx1paqa` service tier `on_demand` on tokens per day (TPD): Limit 200000, Used 199379, Requested 1219. Please try again in 4m18.336s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}",,,,False,,,
+20261016T122620Z,axiom_self_rag,Q27,multi_document,A release caused a customer-impacting regression and a config change would be slower to recover. What is the right move and what must be confirmed first?,,,0,deployment-rollback-sop.md;payments-high-cpu-runbook.md,"Perform a rollback because the new version is strongly correlated with a customer-impacting regression and a config change is not faster. | Complete the pre-rollback checks first. | If high CPU followed a deployment with growing customer impact, prefer rollback over continued scaling.",0.309,,,,,,True,"RateLimitError: Error code: 429 - {'error': {'message': 'Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kntdty0qexw94v6hqjx1paqa` service tier `on_demand` on tokens per day (TPD): Limit 200000, Used 199378, Requested 791. Please try again in 1m13.008s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}",,,,False,,,
+20261016T122620Z,baseline_rag,Q28,unanswerable,What is the exact monthly cloud cost of running the checkout-api PostgreSQL Orders database?,,,0,,No cost or billing data exists in the runbooks. | A good answer states it cannot be determined from the available documents rather than inventing a figure.,1.069,,,,,,True,"RateLimitError: Error code: 429 - {'error': {'message': 'Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kntdty0qexw94v6hqjx1paqa` service tier `on_demand` on tokens per day (TPD): Limit 200000, Used 199376, Requested 1103. Please try again in 3m26.928s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}",,,,False,,,
+20261016T122620Z,axiom_self_rag,Q28,unanswerable,What is the exact monthly cloud cost of running the checkout-api PostgreSQL Orders database?,,,0,,No cost or billing data exists in the runbooks. | A good answer states it cannot be determined from the available documents rather than inventing a figure.,0.318,,,,,,True,"RateLimitError: Error code: 429 - {'error': {'message': 'Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kntdty0qexw94v6hqjx1paqa` service tier `on_demand` on tokens per day (TPD): Limit 200000, Used 199375, Requested 1507. Please try again in 6m21.024s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}",,,,False,,,
+20261016T122620Z,baseline_rag,Q29,unanswerable,"Who is the on-call engineer scheduled for the next Black Friday, and what is their phone number?",,,0,,No on-call rota or personal contact information exists in the runbooks. | A good answer says this cannot be answered from the available documents.,1.228,,,,,,True,"RateLimitError: Error code: 429 - {'error': {'message': 'Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kntdty0qexw94v6hqjx1paqa` service tier `on_demand` on tokens per day (TPD): Limit 200000, Used 199372, Requested 1177. Please try again in 3m57.168s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}",,,,False,,,
+20261016T122620Z,axiom_self_rag,Q29,unanswerable,"Who is the on-call engineer scheduled for the next Black Friday, and what is their phone number?",,,0,,No on-call rota or personal contact information exists in the runbooks. | A good answer says this cannot be answered from the available documents.,0.546,,,,,,True,"RateLimitError: Error code: 429 - {'error': {'message': 'Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kntdty0qexw94v6hqjx1paqa` service tier `on_demand` on tokens per day (TPD): Limit 200000, Used 199371, Requested 781. Please try again in 1m5.664s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}",,,,False,,,
+20261016T122620Z,baseline_rag,Q30,unanswerable,What eviction policy is configured on the production Redis session cache used by checkout-api?,,,0,,The runbooks mention Redis as a dependency but do not document its configuration or eviction policy. | A good answer states the configuration is not available in the documents.,1.46,,,,,,True,"RateLimitError: Error code: 429 - {'error': {'message': 'Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kntdty0qexw94v6hqjx1paqa` service tier `on_demand` on tokens per day (TPD): Limit 200000, Used 199368, Requested 1807. Please try again in 8m27.6s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}",,,,False,,,
+20261016T122620Z,axiom_self_rag,Q30,unanswerable,What eviction policy is configured on the production Redis session cache used by checkout-api?,,,0,,The runbooks mention Redis as a dependency but do not document its configuration or eviction policy. | A good answer states the configuration is not available in the documents.,0.338,,,,,,True,"RateLimitError: Error code: 429 - {'error': {'message': 'Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kntdty0qexw94v6hqjx1paqa` service tier `on_demand` on tokens per day (TPD): Limit 200000, Used 199367, Requested 1506. Please try again in 6m17.136s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}",,,,False,,,

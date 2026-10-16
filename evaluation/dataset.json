@@ -1,0 +1,345 @@
+[
+  {
+    "id": "Q01",
+    "question": "What is the first thing to compare when 502 errors start on the checkout API immediately after a release?",
+    "category": "direct",
+    "relevant_sources": ["checkout-api-runbook.md"],
+    "expected_answer_points": [
+      "Compare the incident start time with the latest deployment timestamp.",
+      "The 502-after-deployment check order starts with deployment correlation."
+    ],
+    "answerable": true
+  },
+  {
+    "id": "Q02",
+    "question": "In what order should an on-call engineer work through the checks for checkout-api 502 errors that begin after a deployment?",
+    "category": "direct",
+    "relevant_sources": ["checkout-api-runbook.md"],
+    "expected_answer_points": [
+      "Compare incident start time with latest deployment timestamp.",
+      "Check Kubernetes deployment and pod status for checkout-api.",
+      "Inspect readiness-probe failures before restarting pods.",
+      "Review recent checkout-api logs for startup/dependency/configuration errors.",
+      "Verify required environment variables and secrets are present.",
+      "Check connectivity to the Payment Gateway and Orders database.",
+      "Roll back to the last known healthy image if the error rate stays above 5% for five minutes."
+    ],
+    "answerable": true
+  },
+  {
+    "id": "Q03",
+    "question": "Should the on-call engineer delete checkout-api pods repeatedly as the first response to 502 errors?",
+    "category": "direct",
+    "relevant_sources": ["checkout-api-runbook.md"],
+    "expected_answer_points": [
+      "No. Do not delete pods repeatedly as a first response.",
+      "Preserve logs and events needed for diagnosis."
+    ],
+    "answerable": true
+  },
+  {
+    "id": "Q04",
+    "question": "Our checkout-api just returned a wave of 502s right after we shipped a new image. Walk me through how we diagnose whether the deployment caused it.",
+    "category": "paraphrased",
+    "relevant_sources": ["checkout-api-runbook.md"],
+    "expected_answer_points": [
+      "Correlate the incident start with the deployment timestamp.",
+      "Check Kubernetes deployment/pod status.",
+      "Inspect readiness-probe failures before restarting pods.",
+      "Review application logs for startup, dependency, or configuration errors.",
+      "Verify environment variables and secrets in the new deployment."
+    ],
+    "answerable": true
+  },
+  {
+    "id": "Q05",
+    "question": "At what sustained error rate and duration should checkout-api be rolled back after a release?",
+    "category": "direct",
+    "relevant_sources": ["checkout-api-runbook.md", "deployment-rollback-sop.md"],
+    "expected_answer_points": [
+      "Roll back when the error rate remains above 5% for five minutes.",
+      "The new release must be strongly correlated with the incident.",
+      "Use the approved deployment rollback procedure."
+    ],
+    "answerable": true
+  },
+  {
+    "id": "Q06",
+    "question": "When should the checkout-api incident be escalated to the platform team?",
+    "category": "direct",
+    "relevant_sources": ["checkout-api-runbook.md"],
+    "expected_answer_points": [
+      "When the load balancer cannot reach healthy checkout-api pods even though readiness checks are passing."
+    ],
+    "answerable": true
+  },
+  {
+    "id": "Q07",
+    "question": "When should a checkout-api incident be escalated to the database team?",
+    "category": "direct",
+    "relevant_sources": ["checkout-api-runbook.md"],
+    "expected_answer_points": [
+      "When connection-pool errors continue even after the application has been rolled back."
+    ],
+    "answerable": true
+  },
+  {
+    "id": "Q08",
+    "question": "After rolling back checkout-api for a post-deployment 502 incident, what must be verified and how long must things stay stable?",
+    "category": "multi_document",
+    "relevant_sources": ["checkout-api-runbook.md", "deployment-rollback-sop.md"],
+    "expected_answer_points": [
+      "Verify readiness, error rate, latency, and at least one business-level health check after rollback.",
+      "Keep the incident open until metrics remain stable for 15 minutes.",
+      "Use the approved rollback procedure rather than manually editing production containers."
+    ],
+    "answerable": true
+  },
+  {
+    "id": "Q09",
+    "question": "The checkout-api error rate is above 5% five minutes after a deploy. What does the checkout runbook recommend, and which procedure does it point to?",
+    "category": "multi_document",
+    "relevant_sources": ["checkout-api-runbook.md", "deployment-rollback-sop.md"],
+    "expected_answer_points": [
+      "Roll back to the last known healthy image.",
+      "The runbook references the approved deployment rollback procedure.",
+      "Trigger condition is error rate above 5% for five minutes strongly correlated with the new release."
+    ],
+    "answerable": true
+  },
+  {
+    "id": "Q10",
+    "question": "It is failing right after the deploy, what should I do?",
+    "category": "ambiguous",
+    "relevant_sources": [],
+    "expected_answer_points": [
+      "The service and symptoms are not identified.",
+      "A good answer asks which service and what the symptoms are (for example 502 errors versus high CPU).",
+      "It must not assert a specific runbook action for an unknown service."
+    ],
+    "answerable": false
+  },
+  {
+    "id": "Q11",
+    "question": "CPU is high, should I add more replicas?",
+    "category": "ambiguous",
+    "relevant_sources": [],
+    "expected_answer_points": [
+      "The service is not identified, so the correct runbook is unclear.",
+      "A good answer asks which service and notes that scaling should only follow confirming latency, request rate, error rate, and queue depth.",
+      "It should not blindly recommend scaling."
+    ],
+    "answerable": false
+  },
+  {
+    "id": "Q12",
+    "question": "What are the trigger conditions for the payments service high CPU runbook?",
+    "category": "direct",
+    "relevant_sources": ["payments-high-cpu-runbook.md"],
+    "expected_answer_points": [
+      "Average CPU utilization above 85% for 10 minutes, or latency rising together with CPU saturation."
+    ],
+    "answerable": true
+  },
+  {
+    "id": "Q13",
+    "question": "What should be checked before scaling the payments service during high CPU?",
+    "category": "direct",
+    "relevant_sources": ["payments-high-cpu-runbook.md"],
+    "expected_answer_points": [
+      "Application latency, request rate, error rate, and queue depth should be checked before scaling."
+    ],
+    "answerable": true
+  },
+  {
+    "id": "Q14",
+    "question": "What can a single hot payments replica indicate?",
+    "category": "direct",
+    "relevant_sources": ["payments-high-cpu-runbook.md"],
+    "expected_answer_points": [
+      "A stuck worker or uneven traffic distribution."
+    ],
+    "answerable": true
+  },
+  {
+    "id": "Q15",
+    "question": "One payments pod is pegged near full CPU while the other replicas look normal. What does that pattern suggest and what is the next step?",
+    "category": "paraphrased",
+    "relevant_sources": ["payments-high-cpu-runbook.md"],
+    "expected_answer_points": [
+      "Compare CPU usage across replicas.",
+      "A single hot replica can indicate a stuck worker or uneven traffic distribution.",
+      "Investigate before scaling."
+    ],
+    "answerable": true
+  },
+  {
+    "id": "Q16",
+    "question": "What patterns in the logs should you look for when diagnosing payments high CPU?",
+    "category": "direct",
+    "relevant_sources": ["payments-high-cpu-runbook.md"],
+    "expected_answer_points": [
+      "Retry storms, timeout loops, serialization errors, and unusually expensive requests."
+    ],
+    "answerable": true
+  },
+  {
+    "id": "Q17",
+    "question": "What is the safety rule about CPU limits during a payments incident?",
+    "category": "direct",
+    "relevant_sources": ["payments-high-cpu-runbook.md"],
+    "expected_answer_points": [
+      "Do not disable CPU limits or remove production resource controls during an incident without platform-team approval."
+    ],
+    "answerable": true
+  },
+  {
+    "id": "Q18",
+    "question": "Payments CPU spiked right after a deployment and customer impact is increasing. What should be done instead of scaling the faulty release?",
+    "category": "multi_document",
+    "relevant_sources": ["payments-high-cpu-runbook.md", "deployment-rollback-sop.md"],
+    "expected_answer_points": [
+      "Use the rollback procedure rather than continuing to scale a faulty release.",
+      "Rollback is appropriate when a new version is strongly correlated with a customer-impacting regression.",
+      "Pre-rollback checks must be performed."
+    ],
+    "answerable": true
+  },
+  {
+    "id": "Q19",
+    "question": "Is there any limit on how many payments replicas can be added during high CPU?",
+    "category": "direct",
+    "relevant_sources": ["payments-high-cpu-runbook.md"],
+    "expected_answer_points": [
+      "Scale replicas according to the approved production autoscaling limit.",
+      "Scaling should only happen if the service is healthy but capacity is insufficient."
+    ],
+    "answerable": true
+  },
+  {
+    "id": "Q20",
+    "question": "When is a production rollback considered appropriate?",
+    "category": "direct",
+    "relevant_sources": ["deployment-rollback-sop.md"],
+    "expected_answer_points": [
+      "When a newly deployed version is strongly correlated with a customer-impacting regression.",
+      "And recovery through a safe configuration change is not faster than a rollback."
+    ],
+    "answerable": true
+  },
+  {
+    "id": "Q21",
+    "question": "What are the pre-rollback checks in the deployment rollback SOP?",
+    "category": "direct",
+    "relevant_sources": ["deployment-rollback-sop.md"],
+    "expected_answer_points": [
+      "Confirm the currently deployed image/version and the last known healthy version.",
+      "Capture relevant application logs, Kubernetes events, and dashboard screenshots.",
+      "Announce the rollback in the incident channel.",
+      "Verify that database migrations are backward-compatible before rolling back application code."
+    ],
+    "answerable": true
+  },
+  {
+    "id": "Q22",
+    "question": "Why does the rollback SOP require verifying that database migrations are backward-compatible?",
+    "category": "direct",
+    "relevant_sources": ["deployment-rollback-sop.md"],
+    "expected_answer_points": [
+      "Because application code may be rolled back while the database schema stays ahead.",
+      "The pre-rollback step exists to make sure rolling back the code is safe against the current schema."
+    ],
+    "answerable": true
+  },
+  {
+    "id": "Q23",
+    "question": "We need to undo a bad release. What has to be captured and communicated before we roll back?",
+    "category": "paraphrased",
+    "relevant_sources": ["deployment-rollback-sop.md"],
+    "expected_answer_points": [
+      "Capture relevant application logs, Kubernetes events, and dashboard screenshots.",
+      "Announce the rollback in the incident channel.",
+      "Confirm current version and last known healthy version."
+    ],
+    "answerable": true
+  },
+  {
+    "id": "Q24",
+    "question": "How should the actual rollback be performed?",
+    "category": "direct",
+    "relevant_sources": ["deployment-rollback-sop.md"],
+    "expected_answer_points": [
+      "Use the deployment platform's approved rollback action to restore the last known healthy application image.",
+      "Do not manually edit production containers."
+    ],
+    "answerable": true
+  },
+  {
+    "id": "Q25",
+    "question": "After a rollback, what verification is required and for how long must the incident stay open?",
+    "category": "direct",
+    "relevant_sources": ["deployment-rollback-sop.md"],
+    "expected_answer_points": [
+      "Verify readiness, error rate, latency, and at least one business-level health check.",
+      "Keep the incident open until metrics remain stable for 15 minutes."
+    ],
+    "answerable": true
+  },
+  {
+    "id": "Q26",
+    "question": "Compare the stability window required after a rollback with the checkout-api condition that triggers a rollback.",
+    "category": "multi_document",
+    "relevant_sources": ["deployment-rollback-sop.md", "checkout-api-runbook.md"],
+    "expected_answer_points": [
+      "Post-rollback: metrics must remain stable for 15 minutes.",
+      "Checkout-api rollback trigger: error rate above 5% for five minutes.",
+      "These are two different time windows: 15 minutes stability versus 5 minutes of elevated errors."
+    ],
+    "answerable": true
+  },
+  {
+    "id": "Q27",
+    "question": "A release caused a customer-impacting regression and a config change would be slower to recover. What is the right move and what must be confirmed first?",
+    "category": "multi_document",
+    "relevant_sources": ["deployment-rollback-sop.md", "payments-high-cpu-runbook.md"],
+    "expected_answer_points": [
+      "Perform a rollback because the new version is strongly correlated with a customer-impacting regression and a config change is not faster.",
+      "Complete the pre-rollback checks first.",
+      "If high CPU followed a deployment with growing customer impact, prefer rollback over continued scaling."
+    ],
+    "answerable": true
+  },
+  {
+    "id": "Q28",
+    "question": "What is the exact monthly cloud cost of running the checkout-api PostgreSQL Orders database?",
+    "category": "unanswerable",
+    "relevant_sources": [],
+    "expected_answer_points": [
+      "No cost or billing data exists in the runbooks.",
+      "A good answer states it cannot be determined from the available documents rather than inventing a figure."
+    ],
+    "answerable": false
+  },
+  {
+    "id": "Q29",
+    "question": "Who is the on-call engineer scheduled for the next Black Friday, and what is their phone number?",
+    "category": "unanswerable",
+    "relevant_sources": [],
+    "expected_answer_points": [
+      "No on-call rota or personal contact information exists in the runbooks.",
+      "A good answer says this cannot be answered from the available documents."
+    ],
+    "answerable": false
+  },
+  {
+    "id": "Q30",
+    "question": "What eviction policy is configured on the production Redis session cache used by checkout-api?",
+    "category": "unanswerable",
+    "relevant_sources": [],
+    "expected_answer_points": [
+      "The runbooks mention Redis as a dependency but do not document its configuration or eviction policy.",
+      "A good answer states the configuration is not available in the documents."
+    ],
+    "answerable": false
+  }
+]

@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parent.parent
 class Settings(BaseModel):
     # Groq
     groq_api_key: str = os.getenv("GROQ_API_KEY", "")
-    groq_model: str = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
+    groq_model: str = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
     # HuggingFace Embeddings
     embedding_model: str = os.getenv(
         "EMBEDDING_MODEL",
