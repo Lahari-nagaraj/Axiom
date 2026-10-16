@@ -160,62 +160,143 @@ def _latency_stats(values: List[float]) -> Dict[str, Any]:
 # --------------------------------------------------------------------------- #
 # Retrieval metrics
 # --------------------------------------------------------------------------- #
-def retrieval_metrics(row: Dict[str, Any]) -> Dict[str, Any]:
-    """Retrieval Precision@5 / Recall@5 over the shared raw top-k retrieval.
+def _dedupe_preserving_order(items: List[str]) -> List[str]:
+    """Deterministic deduplication of ranked item ids (first occurrence wins)."""
+    seen = set()
+    out: List[str] = []
+    for item in items:
+        if item and item not in seen:
+            seen.add(item)
+            out.append(item)
+    return out
 
-    * Retrieved chunks are sliced to the raw top-5, then **deduplicated by
-      source document** so several chunks from one document cannot inflate
-      precision. The precision denominator is therefore the number of distinct
-      retrieved documents (at most 5).
-    * Precision@5 = (distinct retrieved documents that are in ground truth) /
-      (distinct retrieved documents).
-    * Recall@5 = (distinct ground-truth documents present in the top-5) /
-      (total distinct ground-truth documents).
-    * This scores raw retrieval only. Documents used after Self-RAG grading,
-      query rewriting or web search live in ``used_sources`` and are never
-      compared against runbook filenames.
 
-    ``status`` explains any missing value so callers never substitute zero:
+def ranking_metrics(
+    ranked: List[str],
+    relevant: List[str],
+    *,
+    k: int = RETRIEVAL_K,
+    retrieval_available: bool = True,
+) -> Dict[str, Any]:
+    """Question-level ranking metrics over one system's ranked retrieved ids.
 
-    * ``no_ground_truth``    - ambiguous/unanswerable question (both None)
-    * ``no_retrieval_data``  - raw retrieval was not recorded (both None)
-    * ``empty_retrieval``    - retrieval ran but returned nothing
-                               (precision None, recall 0.0 - a genuine miss)
-    * ``scored``             - both metrics computed
+    ``ranked`` is the ordered list of retrieved item ids (the chunk/document id
+    used as the deterministic dedup key) for one system. ``relevant`` is the
+    *binary* ground-truth relevant set for the question; the same set must be
+    used for every system compared on that question.
+
+    With ``rel_i = 1`` when the i-th deduplicated item is relevant else ``0``:
+
+    * ``Precision@k`` = (# distinct top-k items in relevant) / (# distinct top-k)
+    * ``Recall@k``    = (# distinct top-k items in relevant) / (# distinct relevant)
+    * ``reciprocal_rank`` = 1 / rank of the first relevant item in the deduped
+      top-k (``0.0`` when the ground truth is non-empty but nothing relevant was
+      retrieved - a genuine miss that must still count in MRR).
+    * ``average_precision`` (AP@k, the MAP numerator) =
+      (sum over relevant ranks ``i <= k`` of ``Precision@i``) / ``min(|relevant|, k)``
+    * ``ndcg`` = ``DCG@k / IDCG@k`` using **binary gains** and a ``log2(i+1)``
+      discount: ``DCG@k = sum_i rel_i / log2(i+1)`` and
+      ``IDCG@k = sum_{i=1..min(|relevant|, k)} 1 / log2(i+1)``.
+
+    Rules that keep missing data honest:
+
+    * Retrieved ids are sliced to the raw top-k, then deduplicated (first
+      occurrence wins) so several chunks of one document cannot inflate
+      precision; the ranking is the *deduplicated* order.
+    * Fewer than ``k`` retrieved ids are used as-is (never padded with zeros).
+    * A missing value is returned as ``None`` with an explicit ``status`` -
+      never ``0``. ``no_ground_truth`` (nothing relevant labelled),
+      ``no_retrieval_data`` (raw retrieval not recorded) and ``empty_retrieval``
+      (retrieval ran but returned nothing) are the unavailable states.
     """
-    gt_list = _distinct(_split_sources(row.get("ground_truth_sources")))
+    rel = _dedupe_preserving_order([str(s).strip() for s in (relevant or []) if str(s).strip()])
+    ranked_clean = [str(s).strip() for s in (ranked or []) if str(s).strip()]
+    top = _dedupe_preserving_order(ranked_clean[:k])
     base = {
         "precision": None,
         "recall": None,
+        "reciprocal_rank": None,
+        "average_precision": None,
+        "ndcg": None,
         "status": "no_ground_truth",
         "denominator": 0,
-        "gt_count": len(gt_list),
-        "retrieved_count": 0,
-        "retrieved_raw_count": 0,
+        "gt_count": len(rel),
+        "retrieved_count": len(top),
+        "retrieved_raw_count": len(ranked_clean[:k]),
     }
-    if not gt_list:
+    if not rel:
         return base
-    if not _retrieval_available(row):
+    if not retrieval_available:
         return {**base, "status": "no_retrieval_data"}
-
-    retrieved_raw = _split_sources(row.get("retrieved_sources"))[:RETRIEVAL_K]
-    retrieved = _distinct(retrieved_raw)
-    base["retrieved_raw_count"] = len(retrieved_raw)
-    base["retrieved_count"] = len(retrieved)
-    if not retrieved:
-        return {**base, "status": "empty_retrieval", "recall": 0.0}
-
-    gt_set = set(gt_list)
-    hits = [s for s in retrieved if s in gt_set]
-    base.update(
-        {
-            "precision": round(len(hits) / len(retrieved), 4),
-            "recall": round(len(set(hits)) / len(gt_list), 4),
-            "status": "scored",
-            "denominator": len(retrieved),
+    if not top:
+        # Retrieval ran but returned nothing (precision is undefined, the rest
+        # are genuine misses - matching the documented Recall@k behaviour).
+        return {
+            **base,
+            "status": "empty_retrieval",
+            "recall": 0.0,
+            "reciprocal_rank": 0.0,
+            "average_precision": 0.0,
+            "ndcg": 0.0,
         }
+
+    rel_set = set(rel)
+    flags = [1 if item in rel_set else 0 for item in top]
+    hits = sum(flags)
+
+    reciprocal_rank = 0.0
+    for rank, flag in enumerate(flags, 1):
+        if flag:
+            reciprocal_rank = round(1.0 / rank, 4)
+            break
+
+    running_hits = 0
+    average_precision_sum = 0.0
+    for rank, flag in enumerate(flags, 1):
+        if flag:
+            running_hits += 1
+            average_precision_sum += running_hits / rank
+
+    dcg = sum(flag / math.log2(rank + 1) for rank, flag in enumerate(flags, 1))
+    idcg = sum(1.0 / math.log2(rank + 1) for rank in range(1, min(len(rel), k) + 1))
+
+    return {
+        **base,
+        "precision": round(hits / len(top), 4),
+        "recall": round(hits / len(rel), 4),
+        "reciprocal_rank": reciprocal_rank,
+        "average_precision": round(average_precision_sum / min(len(rel), k), 4),
+        "ndcg": round(dcg / idcg, 4) if idcg > 0 else None,
+        "status": "scored",
+        "denominator": len(top),
+    }
+
+
+def retrieval_metrics(row: Dict[str, Any]) -> Dict[str, Any]:
+    """Per-row retrieval ranking metrics over the shared raw top-k retrieval.
+
+    Reads the ``;``-separated raw top-k retrieval (``retrieved_sources``) and the
+    binary ground-truth labels (``ground_truth_sources``), then delegates to
+    :func:`ranking_metrics` for Precision@5, Recall@5, reciprocal rank, AP@5 and
+    nDCG@5.
+
+    This scores raw retrieval only. Documents used after Self-RAG grading, query
+    rewriting or web search live in ``used_sources`` and are never compared
+    against runbook filenames here.
+
+    ``status`` explains any missing value so callers never substitute zero:
+
+    * ``no_ground_truth``    - ambiguous/unanswerable question (all None)
+    * ``no_retrieval_data``  - raw retrieval was not recorded (all None)
+    * ``empty_retrieval``    - retrieval ran but returned nothing
+                               (precision None, the rest 0.0 - a genuine miss)
+    * ``scored``             - ranking metrics computed
+    """
+    return ranking_metrics(
+        _split_sources(row.get("retrieved_sources")),
+        _split_sources(row.get("ground_truth_sources")),
+        retrieval_available=_retrieval_available(row),
     )
-    return base
 
 
 # --------------------------------------------------------------------------- #
@@ -249,15 +330,28 @@ def aggregate_system(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
     usage_rows = sum(1 for r in rows if _to_bool(r.get("token_usage_available")))
 
     # --- Retrieval: raw top-k shared by both systems, deduped by document. --
+    # MRR/MAP@5/nDCG@5 are averaged over the same eligible, labelled questions
+    # (rows with a non-empty ground truth), so their samples/coverage must be
+    # reported alongside the means.
     precisions, recalls = [], []
+    reciprocal_ranks, average_precisions, ndcgs = [], [], []
     status_counts: Dict[str, int] = {}
+    labelled_questions = 0
     for r in rows:
         m = retrieval_metrics(r)
         status_counts[m["status"]] = status_counts.get(m["status"], 0) + 1
+        if m["gt_count"]:
+            labelled_questions += 1
         if m["precision"] is not None:
             precisions.append(m["precision"])
         if m["recall"] is not None:
             recalls.append(m["recall"])
+        if m["reciprocal_rank"] is not None:
+            reciprocal_ranks.append(m["reciprocal_rank"])
+        if m["average_precision"] is not None:
+            average_precisions.append(m["average_precision"])
+        if m["ndcg"] is not None:
+            ndcgs.append(m["ndcg"])
 
     # --- Manual scores: only reviewed AND successful rows. -----------------
     correctness, faithfulness = [], []
@@ -330,11 +424,25 @@ def aggregate_system(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
             "retrieval": {
                 "unit": "document-level, over the shared raw top-k retrieval",
                 "k": RETRIEVAL_K,
+                "relevance": "binary",
                 "dedup": "retrieved chunks are deduplicated by source document before scoring",
                 "precision_at_5_mean": round(statistics.fmean(precisions), 4) if precisions else None,
                 "recall_at_5_mean": round(statistics.fmean(recalls), 4) if recalls else None,
+                "mrr": round(statistics.fmean(reciprocal_ranks), 4) if reciprocal_ranks else None,
+                "map_at_5": round(statistics.fmean(average_precisions), 4) if average_precisions else None,
+                "ndcg_at_5": round(statistics.fmean(ndcgs), 4) if ndcgs else None,
                 "precision_sample": len(precisions),
                 "recall_sample": len(recalls),
+                "mrr_sample": len(reciprocal_ranks),
+                "map_at_5_sample": len(average_precisions),
+                "ndcg_at_5_sample": len(ndcgs),
+                "labelled_questions": labelled_questions,
+                "total_questions": total,
+                "coverage": round(labelled_questions / total, 4) if total else None,
+                "ndcg_formula": (
+                    "binary gains, log2(i+1) discount: DCG@5 = sum(rel_i / log2(i+1)); "
+                    "IDCG@5 = sum(1 / log2(i+1)) over min(#relevant, 5); nDCG@5 = DCG@5 / IDCG@5"
+                ),
                 "status_counts": status_counts,
                 "excluded_no_ground_truth": status_counts.get("no_ground_truth", 0),
                 "excluded_no_retrieval_data": status_counts.get("no_retrieval_data", 0),
@@ -406,6 +514,35 @@ def metric_definitions() -> Dict[str, Any]:
             ),
             "scope": "shared raw top-k retrieval",
             "excluded": "questions with no ground-truth sources",
+        },
+        "retrieval_mrr": {
+            "label": "Retrieval MRR (Mean Reciprocal Rank)",
+            "formula": "mean over eligible labelled questions of 1 / rank(first relevant item in the deduped top-5)",
+            "dedup": "deduplicated by source document",
+            "relevance": "binary",
+            "excluded": "questions with no ground-truth sources or no recorded raw retrieval",
+            "note": "A labelled question where nothing relevant was retrieved scores 0, so MRR is not biased upward.",
+        },
+        "retrieval_map_at_5": {
+            "label": "Retrieval MAP@5 (Mean Average Precision)",
+            "formula": (
+                "mean over eligible labelled questions of "
+                "(sum over relevant ranks i<=5 of Precision@i) / min(#relevant, 5)"
+            ),
+            "dedup": "deduplicated by source document",
+            "relevance": "binary",
+            "excluded": "questions with no ground-truth sources or no recorded raw retrieval",
+        },
+        "retrieval_ndcg_at_5": {
+            "label": "Retrieval nDCG@5",
+            "formula": (
+                "DCG@5 / IDCG@5 with binary gains and a log2(i+1) discount: "
+                "DCG@5 = sum(rel_i / log2(i+1)); IDCG@5 = sum(1 / log2(i+1)) over min(#relevant, 5)"
+            ),
+            "relevance": "binary",
+            "dedup": "deduplicated by source document",
+            "excluded": "questions with no ground-truth sources or no recorded raw retrieval",
+            "zero_denominator_rule": "IDCG@5 = 0 (no labelled relevant item) -> reported as null, never 0.",
         },
         "answer_correctness_manual": {
             "label": f"Answer Correctness (manual, {MANUAL_MIN}-{MANUAL_MAX})",
@@ -499,8 +636,14 @@ def summary_rows(summary: Dict[str, Any]) -> List[Dict[str, Any]]:
                 "latency_failed_p95_s": lat["failed"]["p95"],
                 "retrieval_precision_at_5_mean": ret["precision_at_5_mean"],
                 "retrieval_recall_at_5_mean": ret["recall_at_5_mean"],
+                "retrieval_mrr": ret["mrr"],
+                "retrieval_map_at_5": ret["map_at_5"],
+                "retrieval_ndcg_at_5": ret["ndcg_at_5"],
                 "retrieval_precision_sample": ret["precision_sample"],
                 "retrieval_recall_sample": ret["recall_sample"],
+                "retrieval_scored_questions": ret["labelled_questions"],
+                "retrieval_total_questions": ret["total_questions"],
+                "retrieval_coverage": ret["coverage"],
                 "retrieval_excluded_no_ground_truth": ret["excluded_no_ground_truth"],
                 "retrieval_excluded_no_retrieval_data": ret["excluded_no_retrieval_data"],
                 "retrieval_empty_retrieval": ret["empty_retrieval"],
@@ -597,6 +740,8 @@ def main(argv: Optional[List[str]] = None) -> int:
               f"p50={lat['failed']['p50']} p95={lat['failed']['p95']}s")
         print(f"    retrieval P@5 / R@5  : {ret['precision_at_5_mean']} / {ret['recall_at_5_mean']} "
               f"(precision n={ret['precision_sample']}, recall n={ret['recall_sample']})")
+        print(f"    retrieval MRR/MAP/nDCG@5: {ret['mrr']} / {ret['map_at_5']} / {ret['ndcg_at_5']} "
+              f"(n={ret['mrr_sample']}, coverage={ret['coverage']})")
         print(f"    retrieval exclusions : no_gt={ret['excluded_no_ground_truth']} "
               f"no_retrieval={ret['excluded_no_retrieval_data']} empty={ret['empty_retrieval']}")
         tokens = auto["tokens"]

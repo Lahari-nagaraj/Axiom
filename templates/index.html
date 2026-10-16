@@ -20,7 +20,8 @@
 
       <div class="rail-label">CONTROL CENTER</div>
       <nav class="nav">
-        <button class="nav-item active"><span>◈</span> Incident Copilot</button>
+        <button class="nav-item active" data-view="copilot"><span>◈</span> Incident Copilot</button>
+        <button class="nav-item" data-view="dashboard"><span>▤</span> Evaluation Dashboard</button>
         <!--
         <button class="nav-item"><span>▱</span> Runbook Vault</button>
         <button class="nav-item"><span>⌁</span> Audit Trail</button>
@@ -48,6 +49,7 @@
     </aside>
 
     <main class="workspace">
+      <div id="copilotView" class="view">
       <header class="topbar">
         <div>
           <div class="eyebrow">PRODUCTION RELIABILITY</div>
@@ -99,8 +101,49 @@
           <div class="composer-note"><span>SQLite conversation memory enabled</span><span>•</span><span>Private evidence prioritized</span><span>•</span><span>Internet search activates only when needed</span></div>
         </div>
       </section>
+      </div>
+
+      <div id="dashboardView" class="view dashboard" hidden>
+        <header class="dash-head">
+          <div>
+            <div class="eyebrow">LIVE EVALUATION</div>
+            <h1>Question history</h1>
+            <p>Every question asked through this console, newest first. Open a question to see its own Baseline RAG and Self-RAG evaluation, computed automatically from that request's actual records. No cross-question aggregates are shown.</p>
+          </div>
+          <div class="dash-controls">
+            <button id="dashRefresh" class="secondary-btn" type="button">Refresh</button>
+          </div>
+        </header>
+
+        <div id="dashStatus" class="dash-status" hidden></div>
+
+        <section class="dash-panel">
+          <div class="dash-panel-head">
+            <h3>Per-question history</h3>
+            <div class="dash-pager">
+              <button id="dashPrev" class="mini-btn" type="button">‹ Prev</button>
+              <span id="dashPageInfo" class="dash-hint">—</span>
+              <button id="dashNext" class="mini-btn" type="button">Next ›</button>
+            </div>
+          </div>
+          <div id="dashHistory"></div>
+        </section>
+      </div>
     </main>
   </div>
+
+  <div id="questionDetail" class="question-detail" hidden>
+    <header class="qd-head">
+      <button id="qdBack" class="mini-btn" type="button">‹ Back to Question History</button>
+      <div class="qd-title">
+        <strong id="qdTitle">Question detail</strong>
+        <span id="qdMeta" class="dash-hint"></span>
+      </div>
+      <button id="qdClose" class="mini-btn" type="button">Close</button>
+    </header>
+    <div id="qdBody" class="qd-body"></div>
+  </div>
+<script src="/static/dashboard.js?v=2"></script>
 <script src="/static/app.js?v=2"></script>
 </body>
 </html>
