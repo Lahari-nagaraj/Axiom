@@ -1,12 +1,9 @@
 from typing import List, TypedDict, Literal, Annotated
-import json
 import operator
 import sqlite3
 from pathlib import Path
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field
 from langchain_core.documents import Document
-from langchain_core.exceptions import OutputParserException
-from langchain_core.messages import HumanMessage
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph, START, END
@@ -68,56 +65,7 @@ def _llm():
         api_key=s.groq_api_key,
         model=s.groq_model,
         temperature=0,
-        # gpt-oss models are reasoning models. With Groq's default "raw" reasoning
-        # format the reasoning is embedded in message.content wrapped in
-        # <think>...</think> tags. The structured-output JSON parser reads
-        # message.content, so it can pick up reasoning (which frequently echoes the
-        # JSON schema it was given) instead of the decision object. "parsed" moves
-        # reasoning into additional_kwargs["reasoning_content"] and keeps content
-        # clean JSON / plain text.
-        reasoning_format="parsed",
     )
-
-
-# Bounded number of parse attempts for structured decisions. Retries guard
-# against transient/malformed generations; they never invent a result.
-STRUCTURED_PARSE_ATTEMPTS = 2
-STRUCTURED_PARSE_NUDGE = (
-    "Your previous response could not be parsed. Respond with ONLY a single JSON "
-    "object that matches the required schema. Do not include reasoning, "
-    "explanations, markdown code fences, or the schema itself."
-)
-
-
-class StructuredOutputError(RuntimeError):
-    """Structured output could not be parsed after bounded retries.
-
-    Raised explicitly so the caller fails the step instead of fabricating a
-    decision or silently skipping it.
-    """
-
-
-def _structured_output(model_cls, messages, *, node: str, attempts: int = STRUCTURED_PARSE_ATTEMPTS):
-    """Invoke a structured-output chain with bounded parse retries.
-
-    On the first parse failure the original messages are re-sent with a short
-    corrective instruction. If every attempt fails, raise ``StructuredOutputError``
-    rather than returning a guessed value.
-    """
-    llm = _llm().with_structured_output(model_cls, method="json_schema")
-    last_error = None
-    current = messages
-    for attempt in range(1, attempts + 1):
-        try:
-            return llm.invoke(current)
-        except (OutputParserException, ValidationError, json.JSONDecodeError) as exc:
-            last_error = exc
-            if attempt < attempts:
-                current = [*messages, HumanMessage(content=STRUCTURED_PARSE_NUDGE)]
-    raise StructuredOutputError(
-        f"{node}: could not parse {getattr(model_cls, '__name__', model_cls)} "
-        f"after {attempts} attempt(s): {type(last_error).__name__}"
-    ) from last_error
 
 
 def _trace(state: RAGState, item: str):
@@ -154,10 +102,8 @@ def contextualize_question(state: RAGState):
         ("system", "Rewrite the newest user message as a standalone cloud-operations question using the previous conversation only when needed. Preserve service names, symptoms, errors, and constraints. If the message already stands alone, return it unchanged. Do not answer the question."),
         ("human", "Previous conversation:\n{history}\n\nNewest message:\n{question}"),
     ])
-    out = _structured_output(
-        QueryRewrite,
-        prompt.format_messages(history=history, question=user_question),
-        node="contextualize",
+    out = _llm().with_structured_output(QueryRewrite,method="json_schema").invoke(
+        prompt.format_messages(history=history, question=user_question)
     )
     return {"question": out.query, "trace": _trace(state, f"Memory contextualized question: {out.query}")}
 
@@ -175,11 +121,7 @@ def decide_retrieval(state: RAGState):
         ("system", "You decide whether the question needs retrieval. Choose true for cloud operations, production incidents, service runbooks, deployment procedures, infrastructure behavior, troubleshooting steps, specific/current technical facts, or whenever evidence is needed. Choose false only for generic technical explanations that can safely be answered from general knowledge. If unsure choose true."),
         ("human", "Question: {question}"),
     ])
-    out = _structured_output(
-        RetrieveDecision,
-        prompt.format_messages(question=state["question"]),
-        node="decide_retrieval",
-    )
+    out = _llm().with_structured_output(RetrieveDecision,method="json_schema").invoke(prompt.format_messages(question=state["question"]))
     return {"need_retrieval": out.should_retrieve, "trace": _trace(state, f"Retrieval decision: {out.should_retrieve}")}
 
 
@@ -209,27 +151,17 @@ def grade_relevance(state: RAGState):
         ("system", "Judge relevance at the topic/evidence level. A document is relevant when it contains information useful for answering the user's question. Do not require the exact final answer. Be strict about unrelated content."),
         ("human", "Question:\n{question}\n\nDocument:\n{document}"),
     ])
+    grader = _llm().with_structured_output(RelevanceDecision, method="json_schema")
     relevant = []
-    ungraded = 0
-    docs = state.get("docs", [])
-    for d in docs:
+    for d in state.get("docs", []):
         try:
-            decision = _structured_output(
-                RelevanceDecision,
-                prompt.format_messages(question=state["question"], document=d.page_content[:7000]),
-                node="grade_relevance",
-            )
-        except StructuredOutputError:
-            # A single unparseable grade is skipped explicitly and counted; the
-            # document is not assumed relevant. Provider/quota errors are NOT
-            # swallowed here and propagate so the request is recorded as failed.
-            ungraded += 1
+            decision = grader.invoke(prompt.format_messages(question=state["question"], document=d.page_content[:7000]))
+            if decision.is_relevant:
+                relevant.append(d)
+        except Exception:
             continue
-        if decision.is_relevant:
-            relevant.append(d)
     mode = state.get("source_mode", "internal")
-    note = f" ({ungraded} ungraded)" if ungraded else ""
-    return {"relevant_docs": relevant, "trace": _trace(state, f"Relevance grade ({mode}): {len(relevant)}/{len(docs)} relevant{note}")}
+    return {"relevant_docs": relevant, "trace": _trace(state, f"Relevance grade ({mode}): {len(relevant)}/{len(state.get('docs', []))} relevant")}
 
 
 def route_after_relevance(state: RAGState) -> Literal["generate", "rewrite_internal", "rewrite_web", "no_answer"]:
@@ -250,11 +182,7 @@ def rewrite_internal_query(state: RAGState):
         ("system", "Rewrite the operations question for semantic vector retrieval over internal cloud runbooks, SOPs, postmortems, architecture notes, and troubleshooting documents. Use 6-18 words, preserve service names and error symptoms, add useful operations keywords, remove filler, and do not answer."),
         ("human", "Question: {question}\nPrevious query: {previous}"),
     ])
-    out = _structured_output(
-        QueryRewrite,
-        prompt.format_messages(question=state["question"], previous=state.get("retrieval_query", "")),
-        node="rewrite_internal_query",
-    )
+    out = _llm().with_structured_output(QueryRewrite, method="json_schema").invoke(prompt.format_messages(question=state["question"], previous=state.get("retrieval_query", "")))
     return {"retrieval_query": out.query, "retrieval_rewrites": state.get("retrieval_rewrites", 0)+1, "docs": [], "relevant_docs": [], "trace": _trace(state, f"Rewrote internal query: {out.query}")}
 
 
@@ -263,11 +191,7 @@ def rewrite_web_query(state: RAGState):
         ("system", "Rewrite the question into a concise internet search query of 6-14 words. Preserve important entities. Add recency wording when the question asks for latest/current/today. Do not answer."),
         ("human", "Question: {question}\nPrevious web query: {previous}"),
     ])
-    out = _structured_output(
-        QueryRewrite,
-        prompt.format_messages(question=state["question"], previous=state.get("web_query", "")),
-        node="rewrite_web_query",
-    )
+    out = _llm().with_structured_output(QueryRewrite, method="json_schema").invoke(prompt.format_messages(question=state["question"], previous=state.get("web_query", "")))
     return {"web_query": out.query, "web_rewrites": state.get("web_rewrites", 0)+1, "docs": [], "relevant_docs": [], "trace": _trace(state, f"Prepared internet search query: {out.query}")}
 
 
@@ -303,11 +227,7 @@ def check_support(state: RAGState):
         ("system", "Verify whether every meaningful claim in the answer is supported by the supplied evidence. Return fully_supported only when all important claims are grounded; partially_supported when some claims are grounded but some are not; no_support when key claims are unsupported. Evidence excerpts should be short."),
         ("human", "Question:\n{question}\n\nAnswer:\n{answer}\n\nEvidence:\n{context}"),
     ])
-    out = _structured_output(
-        SupportDecision,
-        prompt.format_messages(question=state["question"], answer=state.get("answer", ""), context=state.get("context", "")),
-        node="check_support",
-    )
+    out = _llm().with_structured_output(SupportDecision, method="json_schema").invoke(prompt.format_messages(question=state["question"], answer=state.get("answer", ""), context=state.get("context", "")))
     return {"support_status": out.status, "evidence": out.evidence, "trace": _trace(state, f"Support check: {out.status}")}
 
 
@@ -333,11 +253,7 @@ def check_usefulness(state: RAGState):
         ("system", "Judge only whether the answer directly addresses the user's question. Do not re-grade factual grounding. Return useful or not_useful and a one-line reason."),
         ("human", "Question:\n{question}\n\nAnswer:\n{answer}"),
     ])
-    out = _structured_output(
-        UsefulnessDecision,
-        prompt.format_messages(question=state["question"], answer=state.get("answer", "")),
-        node="check_usefulness",
-    )
+    out = _llm().with_structured_output(UsefulnessDecision, method="json_schema").invoke(prompt.format_messages(question=state["question"], answer=state.get("answer", "")))
     return {"usefulness": out.status, "use_reason": out.reason, "trace": _trace(state, f"Usefulness check: {out.status}")}
 
 

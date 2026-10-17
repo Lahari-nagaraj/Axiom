@@ -2,7 +2,7 @@ from pathlib import Path
 
 from src.config import get_settings
 from src.ingestion import ingest_directory, SUPPORTED
-from src.vectorstore import EMBEDDING_DIMENSION, EMBEDDING_MODEL, ensure_index
+from src.vectorstore import ensure_index
 
 
 ROOT = Path(__file__).resolve().parent
@@ -25,11 +25,8 @@ def main():
     print("=" * 68)
     print("Axiom - Pinecone Knowledge Base Ingestion")
     print("=" * 68)
-    # Ingestion and query both embed through src.vectorstore.get_vector_store(),
-    # which uses PineconeEmbeddings. Report those actual constants rather than the
-    # stale config.embedding_model / hard-coded 384.
-    print(f"Embedding model        : {EMBEDDING_MODEL}")
-    print(f"Embedding dimension    : {EMBEDDING_DIMENSION}")
+    print(f"Embedding model        : {s.embedding_model}")
+    print(f"Embedding dimension    : 384")
     print(f"Pinecone index         : {s.pinecone_index_name}")
     print(f"Pinecone namespace     : {s.pinecone_namespace}")
     print(f"Documents directory    : {DOCUMENTS_DIR}")
