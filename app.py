@@ -1,7 +1,6 @@
 from pathlib import Path
 import shutil
-import time
-from fastapi import FastAPI, Request, UploadFile, File, HTTPException, BackgroundTasks
+from fastapi import FastAPI, Request, UploadFile, File, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -10,9 +9,6 @@ from src.models import ChatRequest, ChatResponse, UploadResponse
 from src.self_rag import run_self_rag
 from src.ingestion import ingest_file, namespace, SUPPORTED
 from src.db import init_db, save_audit, latest_audits
-from src.live_db import init_live_db
-from src.live_eval import new_request_id, record_chat, schedule_baseline_shadow
-from src.api_eval import router as evaluation_router
 from dotenv import load_dotenv
 
 load_dotenv()  # Load environment variables from .env file
@@ -29,14 +25,12 @@ app = FastAPI(
 )
 app.mount("/static", StaticFiles(directory=str(ROOT / "static")), name="static")
 templates = Jinja2Templates(directory=str(ROOT / "templates"))
-app.include_router(evaluation_router)
 
 
 
 @app.on_event("startup")
 def startup():
     init_db()
-    init_live_db()
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -54,41 +48,13 @@ def health():
 
 
 @app.post("/api/chat", response_model=ChatResponse)
-async def chat(payload: ChatRequest, background_tasks: BackgroundTasks):
-    question = payload.question.strip()
-    thread_id = payload.thread_id.strip()
-    request_id = new_request_id()
-    started = time.perf_counter()
+async def chat(payload: ChatRequest):
     try:
-        result = await run_in_threadpool(run_self_rag, question, thread_id)
+        result = await run_in_threadpool(run_self_rag, payload.question.strip(), payload.thread_id.strip())
+        await run_in_threadpool(save_audit, payload.question, result)
+        return ChatResponse(**result)
     except Exception as e:
-        latency = time.perf_counter() - started
-        # Logging the failure must never mask the original error.
-        try:
-            await run_in_threadpool(record_chat, request_id, question, thread_id, None, latency, e)
-        except Exception:
-            pass
         raise HTTPException(status_code=500, detail=str(e))
-
-    latency = time.perf_counter() - started
-    # Persist the request + Self-RAG evaluation. record_chat is fail-safe.
-    try:
-        await run_in_threadpool(record_chat, request_id, question, thread_id, result, latency)
-    except Exception:
-        pass
-
-    # Legacy audit table kept for backwards compatibility; a failure is non-fatal.
-    try:
-        await run_in_threadpool(save_audit, question, result)
-    except Exception:
-        pass
-
-    # Baseline RAG shadow evaluation runs after the response is sent.
-    try:
-        schedule_baseline_shadow(background_tasks, request_id, question)
-    except Exception:
-        pass
-    return ChatResponse(request_id=request_id, **result)
 
 
 @app.post("/api/upload", response_model=UploadResponse)

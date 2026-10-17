@@ -14,7 +14,6 @@ from langgraph.checkpoint.sqlite import SqliteSaver
 from tavily import TavilyClient
 from langchain_groq import ChatGroq
 from src.config import get_settings
-from src.auto_eval import chunk_identity
 from src.vectorstore import get_retriever
 
 
@@ -39,60 +38,6 @@ class RAGState(TypedDict, total=False):
     source_mode: Literal["internal", "web", "direct", "none"]
     used_web_search: bool
     trace: List[str]
-    retrieved_chunks: List[dict]
-    grades: List[dict]
-    retrieval_available: bool
-    retrieval_round: int
-
-
-# Bounds on the execution artifacts persisted for automatic evaluation. The
-# chunk text is capped so a single request cannot bloat the SQLite database, and
-# the chunk count matches the retriever's top-k.
-CHUNK_TEXT_LIMIT = 2000
-MAX_CHUNKS = 8
-
-
-def _chunk_record(doc: Document, rank: int) -> dict:
-    """A persistable view of one retrieved/used chunk (rank, source, text)."""
-    meta = doc.metadata or {}
-    typ = "web" if meta.get("source_type") == "web" else "internal"
-    page = None
-    if typ == "internal" and meta.get("page") is not None:
-        try:
-            page = int(meta["page"]) + 1
-        except (TypeError, ValueError):
-            page = None
-    source = str(meta.get("document_name") or meta.get("source") or meta.get("url") or "")
-    text = (doc.page_content or "")[:CHUNK_TEXT_LIMIT]
-    return {
-        "rank": rank,
-        "source": source,
-        "title": str(meta.get("title") or meta.get("document_name") or ""),
-        "type": typ,
-        "page": page,
-        "text": text,
-        # Stable identity over (type, source, truncated text) so a recorded grade
-        # can be matched back to the exact chunk it judged.
-        "chunk_id": chunk_identity(typ, source, text),
-    }
-
-
-def _grade_record(doc: Document, relevant: bool, rank: int = 0, retrieval_round: int = 1) -> dict:
-    meta = doc.metadata or {}
-    typ = "web" if meta.get("source_type") == "web" else "internal"
-    source = str(meta.get("document_name") or meta.get("source") or meta.get("url") or "")
-    text = (doc.page_content or "")[:CHUNK_TEXT_LIMIT]
-    return {
-        "chunk_id": chunk_identity(typ, source, text),
-        "source": source,
-        "title": str(meta.get("title") or ""),
-        "type": typ,
-        "relevant": bool(relevant),
-        # Rank within the retrieval round and the round number preserve the
-        # original ranked chunk sequence for the grader-based ranking metrics.
-        "rank": rank,
-        "retrieval_round": retrieval_round,
-    }
 
 
 class RetrieveDecision(BaseModel):
@@ -123,7 +68,6 @@ def _llm():
         api_key=s.groq_api_key,
         model=s.groq_model,
         temperature=0,
-        max_tokens=800,
         # gpt-oss models are reasoning models. With Groq's default "raw" reasoning
         # format the reasoning is embedded in message.content wrapped in
         # <think>...</think> tags. The structured-output JSON parser reads
@@ -132,7 +76,6 @@ def _llm():
         # reasoning into additional_kwargs["reasoning_content"] and keeps content
         # clean JSON / plain text.
         reasoning_format="parsed",
-
     )
 
 
@@ -258,22 +201,7 @@ def retrieve_internal(state: RAGState):
     docs = get_retriever().invoke(q)
     for d in docs:
         d.metadata = {**(d.metadata or {}), "source_type": "internal"}
-    update = {
-        "docs": docs,
-        "relevant_docs": [],
-        "source_mode": "internal",
-        "retrieval_available": True,
-        "retrieval_round": state.get("retrieval_round", 0) + 1,
-        "trace": _trace(state, f"Internal retrieval: {len(docs)} chunks"),
-    }
-    # The first internal retrieval is the system's *initial* retrieval. Retries
-    # after a query rewrite must not overwrite it, so the recorded chunks stay
-    # the ones the initial query produced.
-    if not state.get("retrieved_chunks"):
-        update["retrieved_chunks"] = [
-            _chunk_record(d, i) for i, d in enumerate(docs[:MAX_CHUNKS], 1)
-        ]
-    return update
+    return {"docs": docs, "relevant_docs": [], "source_mode": "internal", "trace": _trace(state, f"Internal retrieval: {len(docs)} chunks")}
 
 
 def grade_relevance(state: RAGState):
@@ -283,10 +211,8 @@ def grade_relevance(state: RAGState):
     ])
     relevant = []
     ungraded = 0
-    new_grades = []
     docs = state.get("docs", [])
-    retrieval_round = state.get("retrieval_round", 1)
-    for position, d in enumerate(docs, 1):
+    for d in docs:
         try:
             decision = _structured_output(
                 RelevanceDecision,
@@ -299,16 +225,11 @@ def grade_relevance(state: RAGState):
             # swallowed here and propagate so the request is recorded as failed.
             ungraded += 1
             continue
-        new_grades.append(_grade_record(d, decision.is_relevant, position, retrieval_round))
         if decision.is_relevant:
             relevant.append(d)
     mode = state.get("source_mode", "internal")
     note = f" ({ungraded} ungraded)" if ungraded else ""
-    return {
-        "relevant_docs": relevant,
-        "grades": [*(state.get("grades") or []), *new_grades],
-        "trace": _trace(state, f"Relevance grade ({mode}): {len(relevant)}/{len(docs)} relevant{note}"),
-    }
+    return {"relevant_docs": relevant, "trace": _trace(state, f"Relevance grade ({mode}): {len(relevant)}/{len(docs)} relevant{note}")}
 
 
 def route_after_relevance(state: RAGState) -> Literal["generate", "rewrite_internal", "rewrite_web", "no_answer"]:
@@ -352,9 +273,8 @@ def rewrite_web_query(state: RAGState):
 
 def web_search(state: RAGState):
     s = get_settings()
-    round_update = {"retrieval_round": state.get("retrieval_round", 0) + 1}
     if not s.tavily_api_key:
-        return {**round_update, "docs": [], "source_mode": "web", "used_web_search": True, "trace": _trace(state, "Internet search unavailable: TAVILY_API_KEY missing")}
+        return {"docs": [], "source_mode": "web", "used_web_search": True, "trace": _trace(state, "Internet search unavailable: TAVILY_API_KEY missing")}
     client = TavilyClient(api_key=s.tavily_api_key)
     q = state.get("web_query") or state["question"]
     response = client.search(query=q, search_depth="advanced", max_results=5, include_answer=False)
@@ -365,7 +285,7 @@ def web_search(state: RAGState):
             page_content=content,
             metadata={"source_type": "web", "source": r.get("url", ""), "url": r.get("url", ""), "title": r.get("title", "")},
         ))
-    return {**round_update, "docs": docs, "source_mode": "web", "used_web_search": True, "trace": _trace(state, f"Internet search: {len(docs)} results")}
+    return {"docs": docs, "source_mode": "web", "used_web_search": True, "trace": _trace(state, f"Internet search: {len(docs)} results")}
 
 
 def generate_from_context(state: RAGState):
@@ -528,31 +448,17 @@ def run_self_rag(question: str, thread_id: str) -> dict:
         "source_mode": "internal",
         "used_web_search": False,
         "trace": [],
-        "retrieved_chunks": [],
-        "grades": [],
-        "retrieval_available": False,
-        "retrieval_round": 0,
     }
     result = _graph.invoke(initial, config={"configurable": {"thread_id": thread_id}, "recursion_limit": 60})
     mode = result.get("source_mode", "none")
     route = {"internal":"Private Runbooks", "web":"Internet Search", "direct":"General Knowledge", "none":"No Reliable Evidence"}.get(mode, mode)
-    final_docs = result.get("relevant_docs", []) or []
     return {
         "answer": result.get("answer", ""),
         "route": route,
         "used_web_search": bool(result.get("used_web_search")),
         "support_status": result.get("support_status", ""),
         "usefulness": result.get("usefulness", ""),
-        "sources": _sources(final_docs),
-        # Real execution artifacts for the automatic evaluation. ``retrieved_chunks``
-        # is the initial retrieval; ``final_evidence`` is what the system actually
-        # used after grading/rewrite/web search. They are kept distinct.
-        "retrieved_chunks": result.get("retrieved_chunks", []) or [],
-        "final_evidence": [
-            _chunk_record(d, i) for i, d in enumerate(final_docs[:MAX_CHUNKS], 1)
-        ],
-        "grades": result.get("grades", []) or [],
-        "retrieval_available": bool(result.get("retrieval_available")),
+        "sources": _sources(result.get("relevant_docs", [])),
         "trace": result.get("trace", []),
         "thread_id": thread_id,
         "memory_turns": len(result.get("memory", [])),

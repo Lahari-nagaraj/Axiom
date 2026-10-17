@@ -56,7 +56,6 @@ async function ask(){
     if(data.support_status) meta+=`<span class="tag ok">IsSUP · ${esc(pretty(data.support_status))}</span>`;
     if(data.usefulness) meta+=`<span class="tag ok">IsUSE · ${esc(pretty(data.usefulness))}</span>`;
     if(data.used_web_search) meta+=`<span class="tag web">INTERNET SEARCH USED</span>`;
-    if(data.request_id) meta+=`<span class="tag">REQ · ${esc(data.request_id.slice(0,8))}</span>`;
     meta+=`<span class="tag memory">SQLITE MEMORY · ${data.memory_turns||0} TURN${(data.memory_turns||0)===1?'':'S'}</span>`;
     meta+='</div>';
     if(data.sources?.length){
@@ -95,16 +94,3 @@ newSessionBtn?.addEventListener('click',()=>{
   starters.style.display='flex';
   q.value=''; q.focus();
 });
-
-/* --- View switching: Incident Copilot <-> Evaluation Dashboard --- */
-const views = {
-  copilot: document.getElementById('copilotView'),
-  dashboard: document.getElementById('dashboardView'),
-};
-function switchView(name){
-  Object.entries(views).forEach(([key, el])=>{ if(el) el.hidden = key !== name; });
-  document.querySelectorAll('.nav-item[data-view]').forEach(b=>b.classList.toggle('active', b.dataset.view === name));
-  if(name === 'dashboard' && window.AxiomDashboard) window.AxiomDashboard.load();
-}
-document.querySelectorAll('.nav-item[data-view]').forEach(b=>b.addEventListener('click', ()=>switchView(b.dataset.view)));
-if(window.AxiomDashboard) window.AxiomDashboard.init();
